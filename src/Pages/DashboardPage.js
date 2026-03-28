@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import TimeLogModal from "../Components/TimeLogModal";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
@@ -127,7 +129,24 @@ function DashboardPage() {
   };
 
   const exportPDF = () => {
-    alert("PDF export not implemented in this prototype; use CSV for now.");
+    const doc = new jsPDF();
+    doc.text("Duty Schedule", 14, 15);
+    
+    const header = [["Date", "Name", "Shift", "Time In", "Time Out"]];
+    const data = events.map((event) => {
+      const [name, shift] = (event.title || "").split(" - ");
+      return [event.date, name || "", shift || "", event.timeIn || "", event.timeOut || ""];
+    });
+
+    autoTable(doc, {
+      head: header,
+      body: data,
+      startY: 20,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [37, 99, 235] },
+    });
+
+    doc.save("duty-schedule.pdf");
   };
 
   return (
