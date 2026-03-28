@@ -35,7 +35,6 @@ const BellIcon = () => (
 
 function DashboardPage() {
   const [events, setEvents] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [search, setSearch] = useState("");
   const [filterShift, setFilterShift] = useState("");
   const [filterDate, setFilterDate] = useState("");
@@ -264,7 +263,7 @@ function DashboardPage() {
       <SectionTitle>Mini Calendar</SectionTitle>
       <MiniCalendar>
         {next7Days.map(({ date, duties }) => {
-          const [year,month,day] = date.split("-");
+          const [, , day] = date.split("-");
           const n = duties.length;
           return (
             <MiniDay key={date} n={n}>

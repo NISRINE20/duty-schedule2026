@@ -228,20 +228,6 @@ const Label = styled.label`
   font-weight: bold;
 `;
 
-const Input = styled.input`
-  width: 100%;
-  padding: 8px;
-  margin-top: 5px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-
-  &:disabled {
-    background-color: #f1f5f9;
-    color: #64748b;
-    cursor: not-allowed;
-  }
-`;
-
 const ButtonGroup = styled.div`
   margin-top: 20px;
   display: flex;

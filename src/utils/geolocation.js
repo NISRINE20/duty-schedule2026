@@ -56,6 +56,9 @@ export function verifyLocation() {
           case error.TIMEOUT:
             errorMessage = "The request to get your location timed out.";
             break;
+          default:
+            errorMessage = "An unknown error occurred while getting your location.";
+            break;
         }
         resolve({ allowed: false, distance: 0, error: errorMessage });
       },
