@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
+import { verifyLocation } from "../utils/geolocation";
 
 function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
   const [timeIn, setTimeIn] = useState(event?.timeIn || '');
   const [timeOut, setTimeOut] = useState(event?.timeOut || '');
   const [isConfirmed, setIsConfirmed] = useState(event?.isConfirmed || false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [locationError, setLocationError] = useState('');
 
   const userRole = localStorage.getItem('authRole');
   const authName = localStorage.getItem('authName');
@@ -16,6 +19,8 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
       setTimeOut(event.timeOut || '');
       setIsConfirmed(event?.isConfirmed || false);
       setShowConfirm(false);
+      setLocationError('');
+      setIsVerifying(false);
     }
   }, [event]);
 
@@ -84,11 +89,21 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                 <strong>Actual Time In:</strong><br/>{timeIn || 'Not logged yet'}
               </div>
               {!timeIn ? (
-                <Button style={{ margin: 0, padding: '8px 16px', fontSize: '14px' }} primary onClick={() => {
+                <Button style={{ margin: 0, padding: '8px 16px', fontSize: '14px' }} primary disabled={isVerifying} onClick={async () => {
+                  setLocationError('');
+                  setIsVerifying(true);
+                  const result = await verifyLocation();
+                  setIsVerifying(false);
+                  
+                  if (!result.allowed) {
+                    setLocationError(result.error || `Verification failed: You are ${result.distance} meters away.`);
+                    return;
+                  }
+
                   const now = new Date();
                   setTimeIn(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
                 }}>
-                  Log Time In
+                  {isVerifying ? 'Verifying Locator...' : 'Log Time In'}
                 </Button>
               ) : (
                 <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ Recorded</span>
@@ -100,16 +115,32 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                 <strong>Actual Time Out:</strong><br/>{timeOut || 'Not logged yet'}
               </div>
               {!timeOut ? (
-                <Button style={{ margin: 0, padding: '8px 16px', fontSize: '14px' }} primary={!!timeIn} disabled={!timeIn} onClick={() => {
+                <Button style={{ margin: 0, padding: '8px 16px', fontSize: '14px' }} primary={!!timeIn} disabled={!timeIn || isVerifying} onClick={async () => {
+                  setLocationError('');
+                  setIsVerifying(true);
+                  const result = await verifyLocation();
+                  setIsVerifying(false);
+                  
+                  if (!result.allowed) {
+                    setLocationError(result.error || `Verification failed: You are ${result.distance} meters away.`);
+                    return;
+                  }
+
                   const now = new Date();
                   setTimeOut(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
                 }}>
-                  Log Time Out
+                  {isVerifying ? 'Verifying Locator...' : 'Log Time Out'}
                 </Button>
               ) : (
                 <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ Recorded</span>
               )}
             </div>
+            
+            {locationError && (
+              <div style={{ color: '#ef4444', fontSize: '14px', fontWeight: 'bold', background: '#fef2f2', padding: '10px', borderRadius: '6px', border: '1px solid #fca5a5' }}>
+                📍 {locationError}
+              </div>
+            )}
           </div>
         )}
 
@@ -183,7 +214,12 @@ const ModalContainer = styled.div`
   background: white;
   padding: 25px;
   border-radius: 15px;
-  width: 400px;
+  width: 90%;
+  max-width: 400px;
+
+  @media (max-width: 480px) {
+    padding: 20px;
+  }
 `;
 
 const Label = styled.label`

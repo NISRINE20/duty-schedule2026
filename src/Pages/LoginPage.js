@@ -149,6 +149,11 @@ const LoginCard = styled.div`
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
   }
+
+  @media (max-width: 768px) {
+    padding: 24px;
+    border-radius: 16px;
+  }
 `;
 
 const Title = styled.h1`
@@ -156,12 +161,22 @@ const Title = styled.h1`
   font-size: 32px;
   margin-bottom: 8px;
   font-weight: 800;
+
+  @media (max-width: 768px) {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
 `;
 
 const Subtitle = styled.p`
   color: #64748b;
   font-size: 18px;
   margin-bottom: 32px;
+
+  @media (max-width: 768px) {
+    font-size: 15px;
+    margin-bottom: 24px;
+  }
 `;
 
 const RolesContainer = styled.div`
@@ -194,6 +209,11 @@ const RoleCard = styled.div`
 const Icon = styled.div`
   font-size: 48px;
   margin-bottom: 16px;
+
+  @media (max-width: 768px) {
+    font-size: 36px;
+    margin-bottom: 12px;
+  }
 `;
 
 const RoleTitle = styled.h3`
@@ -201,6 +221,10 @@ const RoleTitle = styled.h3`
   font-size: 24px;
   margin-bottom: 8px;
   font-weight: 700;
+
+  @media (max-width: 768px) {
+    font-size: 20px;
+  }
 `;
 
 const RoleDescription = styled.p`

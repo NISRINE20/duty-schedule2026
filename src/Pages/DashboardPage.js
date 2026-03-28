@@ -480,6 +480,12 @@ const SectionTitle = styled.h3`
   font-size: 28px;
   font-weight: 700;
   color: #1e293b;
+
+  @media (max-width: 768px) {
+    font-size: 22px;
+    margin-top: 24px;
+    padding-bottom: 8px;
+  }
 `;
 
 const CardGrid = styled.div`
@@ -532,6 +538,16 @@ const Card = styled.div`
     display: block;
     margin-bottom: 10px;
     color: #000;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+    padding: 16px;
+    min-height: auto;
+    strong {
+      font-size: 20px;
+      margin-bottom: 6px;
+    }
   }
 `;
 
@@ -591,6 +607,11 @@ const UpcomingItem = styled.div`
   strong {
     color: #0f62fe;
     font-weight: 700;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+    padding: 12px;
   }
 `;
 
@@ -665,6 +686,15 @@ const AlertCard = styled.div`
     margin-right: 14px;
     font-size: 24px;
   }
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+    padding: 12px 16px;
+    &::before {
+      margin-right: 10px;
+      font-size: 20px;
+    }
+  }
 `;
 
 const AlertOverlay = styled.div`
@@ -690,4 +720,9 @@ const AlertModalContainer = styled.div`
   max-width: 500px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @media (max-width: 768px) {
+    padding: 20px;
+    width: 95%;
+  }
 `;

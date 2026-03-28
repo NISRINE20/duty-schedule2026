@@ -135,6 +135,11 @@ const LoginCard = styled.div`
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
   }
+
+  @media (max-width: 768px) {
+    padding: 24px;
+    border-radius: 16px;
+  }
 `;
 
 const Title = styled.h1`
@@ -142,12 +147,22 @@ const Title = styled.h1`
   font-size: 32px;
   margin-bottom: 8px;
   font-weight: 800;
+
+  @media (max-width: 768px) {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
 `;
 
 const Subtitle = styled.p`
   color: #64748b;
   font-size: 16px;
   margin-bottom: 24px;
+
+  @media (max-width: 768px) {
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
 `;
 
 const UserForm = styled.form`

@@ -241,7 +241,7 @@ const Container = styled.div`
 
 const Title = styled.h2`
   margin-bottom: 8px;
-  font-size: 28px;
+  font-size: clamp(22px, 3.5vw, 28px);
   color: #1e293b;
   font-weight: 700;
 `;
@@ -249,7 +249,7 @@ const Title = styled.h2`
 const Description = styled.p`
   margin-bottom: 24px;
   color: #475569;
-  font-size: 18px;
+  font-size: clamp(15px, 2.5vw, 18px);
 `;
 
 const TemplateForm = styled.div`
@@ -324,10 +324,10 @@ const InputGroup = styled.div`
 
 const Input = styled.input`
   flex: 1;
-  padding: 12px 16px;
+  padding: clamp(8px, 1.5vw, 12px) clamp(10px, 2vw, 16px);
   border: 2px solid #cbd5e1;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: clamp(14px, 2vw, 16px);
   outline: none;
 
   &:focus {
@@ -337,10 +337,10 @@ const Input = styled.input`
 
 const Select = styled.select`
   flex: 1;
-  padding: 12px 16px;
+  padding: clamp(8px, 1.5vw, 12px) clamp(10px, 2vw, 16px);
   border: 2px solid #cbd5e1;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: clamp(14px, 2vw, 16px);
   outline: none;
 
   &:focus {
