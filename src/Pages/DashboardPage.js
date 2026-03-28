@@ -82,29 +82,6 @@ function DashboardPage() {
     return list;
   }, [events]);
 
-  const totalDutiesThisMonth = useMemo(() => {
-    const now = new Date();
-    const month = now.getMonth();
-    const year = now.getFullYear();
-    return events.filter((e) => {
-      const d = new Date(e.date);
-      return d.getMonth() === month && d.getFullYear() === year;
-    }).length;
-  }, [events]);
-
-  const totalCompleted = useMemo(() => {
-    return events.filter((e) => e.timeIn && e.timeOut).length;
-  }, [events]);
-
-  const peopleCount = useMemo(() => {
-    const count = {};
-    events.forEach((event) => {
-      const name = event.title.split(" - ")[0];
-      if (name) count[name] = (count[name] || 0) + 1;
-    });
-    return Object.entries(count).sort((a, b) => b[1] - a[1]);
-  }, [events]);
-
   const unassigned = useMemo(() => events.filter((e) => !e.title || e.title.trim() === ""), [events]);
 
   const overlapping = useMemo(() => {
@@ -179,13 +156,6 @@ function DashboardPage() {
           <span><strong>Note:</strong> If there are any changes needed for your schedule or logged times, please go to the Administrator.</span>
         </div>
       )}
-      <HeaderRow>
-        <SummaryCard><strong>Total duties this month:</strong><br />{totalDutiesThisMonth}</SummaryCard>
-        <SummaryCard><strong>Total shifts completed:</strong><br />{totalCompleted}</SummaryCard>
-        <SummaryCard><strong>Total shifts completed:</strong><br />{totalCompleted}</SummaryCard>
-        <SummaryCard><strong>Top 3 people:</strong><br />{peopleCount.slice(0, 3).map(([name, count]) => <div key={name}>{name} ({count})</div>)}</SummaryCard>
-      </HeaderRow>
-
       <ActionRow>
         <Button onClick={() => navigate("/calendar")}>View Monthly Schedule</Button>
         <Button onClick={exportCSV}>Export Schedule (CSV)</Button>
@@ -337,44 +307,6 @@ const PageContainer = styled.div`
 
   @media (max-width: 768px) {
     padding: 20px 16px;
-  }
-`;
-
-const HeaderRow = styled.div`
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-  margin-bottom: 32px;
-`;
-
-const SummaryCard = styled.div`
-  flex: 1;
-  min-width: 250px;
-  background: #ffffff;
-  padding: 24px;
-  border-radius: 12px;
-  border: 1px solid #cbd5e1;
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-  font-size: 22px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-    border-color: #94a3b8;
-  }
-
-  strong {
-    color: #475569;
-    font-size: 18px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  @media (max-width: 768px) {
-    min-width: 100%;
-    padding: 18px;
-    font-size: 20px;
   }
 `;
 
