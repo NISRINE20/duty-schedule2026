@@ -1,8 +1,7 @@
-// Workplace coordinates (Davao City, Plus Code 5M35+3F)
-export const WORKPLACE_LAT = 7.070625;
-export const WORKPLACE_LNG = 125.6128125;
-export const ALLOWED_RADIUS_METERS = 100; // Allow 100 meters radius
-
+// Workplace coordinates (Kilometer 14, Naval Station Felix Apolinario, Panacan, Davao City)
+export const WORKPLACE_LAT = 7.152000;
+export const WORKPLACE_LNG = 125.661000;
+export const ALLOWED_RADIUS_METERS = 500; // Increased to 500m to cover base area
 /**
  * Calculates the Haversine distance between two coordinates in meters.
  */
