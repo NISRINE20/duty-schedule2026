@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { verifyLocation } from "../utils/geolocation";
+import Loader from './Loader';
 
 function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
   const [timeIn, setTimeIn] = useState(event?.timeIn || '');
@@ -50,6 +51,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
 
   return (
     <Overlay>
+      {isVerifying && <Loader message="Verifying your location..." />}
       <ModalContainer>
         <h2>{canLogTime ? 'Log Time' : 'Duty Details'} for {event.title}</h2>
         <p>Date: {displayDate}</p>

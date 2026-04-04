@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
+import Loader from '../Components/Loader';
 
 const DAY_COLORS = {
   Monday: '#ef4444',
@@ -23,6 +24,7 @@ function TemplatesPage() {
     Saturday: [{ name: '', shift: '', timeIn: '', timeOut: '' }],
     Sunday: [{ name: '', shift: '', timeIn: '', timeOut: '' }],
   });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -33,17 +35,22 @@ function TemplatesPage() {
         }
       } catch (e) {
         console.error("Error fetching templates:", e);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchTemplates();
   }, []);
 
   const saveTemplates = async () => {
+    setIsLoading(true);
     try {
       await setDoc(doc(db, 'config', 'templates'), templates);
       alert("Templates saved successfully!");
     } catch (e) {
       alert("Error saving templates: " + e.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -65,6 +72,7 @@ function TemplatesPage() {
   const removeAssignment = async (day, index) => {
     const target = templates[day][index];
     
+    setIsLoading(true);
     // Auto-sync deletion to the Calendar for the current month
     if (target && target.name) {
       await removeFromCalendar(day, target.name, target.shift);
@@ -74,6 +82,7 @@ function TemplatesPage() {
       const updatedDay = prev[day].filter((_, i) => i !== index);
       return { ...prev, [day]: updatedDay };
     });
+    setIsLoading(false);
   };
 
   const removeFromCalendar = async (dayName, personName, shiftTitle) => {
@@ -114,6 +123,7 @@ function TemplatesPage() {
     const month = now.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+    setIsLoading(true);
     try {
       const eventsSnapshot = await getDocs(collection(db, 'dutyEvents'));
       const currentEvents = eventsSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
@@ -158,11 +168,14 @@ function TemplatesPage() {
       alert(`Template applied! Added ${addedCount} new shifts.`);
     } catch (e) {
       alert("Error applying templates: " + e.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <Container>
+      {isLoading && <Loader message="Processing templates..." />}
       <Title>Monthly Schedule Templates</Title>
       <Description>Set default duties for each day of the week. Then apply to the current month.</Description>
       <TemplateForm>

@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { auth, db } from '../firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
+import Loader from '../Components/Loader';
 
 function SignupPage() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ function SignupPage() {
   const [role, setRole] = useState('user');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const getPseudoEmail = (n) => {
     return n.trim().toLowerCase().replace(/[^a-z0-9]/g, '') + '@dutyschedule.local';
@@ -31,6 +33,7 @@ function SignupPage() {
 
     const email = getPseudoEmail(name);
 
+    setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -50,11 +53,14 @@ function SignupPage() {
       } else {
         alert("Error creating account: " + error.message);
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <PageContainer>
+      {isLoading && <Loader message="Creating account..." />}
       <LoginCard>
         <Title>Create Account</Title>
         <Subtitle>Join the Duty Schedule System</Subtitle>

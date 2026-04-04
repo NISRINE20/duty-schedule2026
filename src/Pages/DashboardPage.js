@@ -6,6 +6,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import Loader from '../Components/Loader';
 
 const USER_COLORS = [
   "#bae6fd", // sky blue
@@ -43,6 +44,7 @@ function DashboardPage() {
   const [timeLogOpen, setTimeLogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   const userRole = localStorage.getItem('authRole');
@@ -54,6 +56,7 @@ function DashboardPage() {
         ...docSnapshot.data() 
       }));
       setEvents(data);
+      setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -151,6 +154,7 @@ function DashboardPage() {
 
   return (
     <PageContainer>
+      {isLoading && <Loader message="Loading dashboard..." />}
       {userRole === 'admin' && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
           <button 
@@ -268,20 +272,26 @@ function DashboardPage() {
         onClose={() => setTimeLogOpen(false)}
         event={selectedEvent}
         onSave={async ({ timeIn, timeOut, isConfirmed }) => {
+          setIsLoading(true);
           try {
             await updateDoc(doc(db, 'dutyEvents', selectedEvent.id), { timeIn, timeOut, isConfirmed });
             setTimeLogOpen(false);
           } catch (e) {
             alert("Error saving log: " + e.message);
+          } finally {
+            setIsLoading(false);
           }
         }}
         onDelete={async () => {
+          setIsLoading(true);
           try {
             await deleteDoc(doc(db, 'dutyEvents', selectedEvent.id));
             setTimeLogOpen(false);
             setSelectedEvent(null);
           } catch (e) {
             alert("Error deleting event: " + e.message);
+          } finally {
+            setIsLoading(false);
           }
         }}
       />

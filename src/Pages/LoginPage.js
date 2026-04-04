@@ -4,12 +4,14 @@ import styled from 'styled-components';
 import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import Loader from '../Components/Loader';
 
 function LoginPage() {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState(null);
   const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const getPseudoEmail = (n) => {
     return n.trim().toLowerCase().replace(/[^a-z0-9]/g, '') + '@dutyschedule.local';
@@ -33,6 +35,7 @@ function LoginPage() {
       return;
     }
 
+    setIsLoading(true);
     try {
       const email = getPseudoEmail(userName);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -56,6 +59,8 @@ function LoginPage() {
       } else {
         alert("Login Error: " + error.message);
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -67,6 +72,7 @@ function LoginPage() {
 
   return (
     <PageContainer>
+      {isLoading && <Loader message="Logging you in..." />}
       <LoginCard>
         <Title>Duty Schedule System</Title>
         <Subtitle>Please select your role to continue</Subtitle>

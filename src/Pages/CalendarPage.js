@@ -9,6 +9,7 @@ import DayScheduleSidebar from "../Components/DayScheduleSidebar";
 import TimeLogModal from "../Components/TimeLogModal";
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import Loader from '../Components/Loader';
 
 function CalendarPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -16,6 +17,7 @@ function CalendarPage() {
   const [events, setEvents] = useState([]);
   const [timeLogOpen, setTimeLogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const USER_COLORS = [
     "#bae6fd", "#bbf7d0", "#fef08a", "#fbcfe8", "#fed7aa", "#e9d5ff", "#ccfbf1", "#fecaca", "#e5e7eb"
@@ -37,6 +39,7 @@ function CalendarPage() {
         ...docSnapshot.data() 
       }));
       setEvents(data);
+      setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -63,6 +66,7 @@ function CalendarPage() {
   });
 
   const handleSave = async ({ name, shift, scheduledTimeIn, scheduledTimeOut }) => {
+    setIsLoading(true);
     try {
       await addDoc(collection(db, 'dutyEvents'), {
         title: `${name} - ${shift}`,
@@ -76,11 +80,14 @@ function CalendarPage() {
       setModalOpen(false);
     } catch (e) {
       alert("Error adding event: " + e.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <Container>
+      {isLoading && <Loader message="Loading calendar..." />}
       <Title>Duty Schedule</Title>
       
       <CalendarBox>
@@ -130,20 +137,26 @@ function CalendarPage() {
         onClose={() => setTimeLogOpen(false)}
         event={selectedEvent}
         onSave={async ({ timeIn, timeOut, isConfirmed }) => {
+          setIsLoading(true);
           try {
             await updateDoc(doc(db, 'dutyEvents', selectedEvent.id), { timeIn, timeOut, isConfirmed });
             setSelectedEvent(prev => ({ ...prev, timeIn, timeOut, isConfirmed }));
           } catch (e) {
             alert("Error saving: " + e.message);
+          } finally {
+            setIsLoading(false);
           }
         }}
         onDelete={async () => {
+          setIsLoading(true);
           try {
             await deleteDoc(doc(db, 'dutyEvents', selectedEvent.id));
             setTimeLogOpen(false);
             setSelectedEvent(null);
           } catch (e) {
             alert("Error deleting event: " + e.message);
+          } finally {
+            setIsLoading(false);
           }
         }}
       />

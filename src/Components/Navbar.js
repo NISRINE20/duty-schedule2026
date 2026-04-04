@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
+import { auth } from '../firebase';
+import { signOut } from 'firebase/auth';
+import Loader from './Loader';
 
 const LogoutIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -48,19 +51,34 @@ const TemplatesIcon = () => (
 
 function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const authRole = localStorage.getItem('authRole');
   const authName = localStorage.getItem('authName');
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    setIsLoading(true);
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Firebase logout error", error);
+    }
     localStorage.removeItem('authRole');
-    navigate('/login');
+    localStorage.removeItem('authName');
+    
+    // Slight artificial delay to allow animation frame and ensure smooth transition 
+    setTimeout(() => {
+      setIsLoading(false);
+      navigate('/login');
+    }, 500);
   };
 
   return (
-    <SidebarContainer $isOpen={isOpen}>
-      <TopSection $isOpen={isOpen}>
+    <>
+      {isLoading && <Loader message="Logging out..." />}
+      <SidebarContainer $isOpen={isOpen}>
+        <TopSection $isOpen={isOpen}>
         {isOpen && <Logo>Duty Schedule</Logo>}
         <MenuButton onClick={() => setIsOpen(!isOpen)} $isOpen={isOpen}>
           <MenuIcon />
@@ -96,6 +114,7 @@ function Navbar() {
         </LogoutButton>
       </BottomSection>
     </SidebarContainer>
+    </>
   );
 }
 
