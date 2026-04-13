@@ -253,19 +253,7 @@ function DashboardPage() {
         </UpcomingItem>
       ))}</UpcomingList>
 
-      <SectionTitle>Mini Calendar</SectionTitle>
-      <MiniCalendar>
-        {next7Days.map(({ date, duties }) => {
-          const [, , day] = date.split("-");
-          const n = duties.length;
-          return (
-            <MiniDay key={date} n={n}>
-              <div>{day}</div>
-              <Badge> {n} </Badge>
-            </MiniDay>
-          );
-        })}
-      </MiniCalendar>
+
       
       <TimeLogModal
         isOpen={timeLogOpen}
@@ -575,59 +563,7 @@ const UpcomingItem = styled.div`
   }
 `;
 
-const MiniCalendar = styled.div`
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
 
-  @media (max-width: 768px) {
-    gap: 6px;
-  }
-`;
-
-const MiniDay = styled.div`
-  border: 2px solid #cbd5e1;
-  border-radius: 12px;
-  padding: 16px;
-  position: relative;
-  background: #ffffff;
-  font-size: 22px;
-  font-weight: 700;
-  color: #1e293b;
-  text-align: center;
-  transition: all 0.2s ease;
-  aspect-ratio: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 6px 15px rgba(0,0,0,0.08);
-    border-color: #94a3b8;
-  }
-
-  @media (max-width: 768px) {
-    padding: 8px;
-    font-size: 16px;
-    border-radius: 8px;
-  }
-`;
-
-const Badge = styled.span`
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #ef4444; /* Clean solid red */
-  color: white;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 0.75em;
-  font-weight: 800;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
-`;
 
 const AlertCard = styled.div`
   background: #fef2f2;

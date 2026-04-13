@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { verifyLocation } from "../utils/geolocation";
+import { getEventStatus } from "../utils/statusHelper";
 import Loader from './Loader';
 
 function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
@@ -34,20 +35,21 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
 
   const displayDate = event.date || (event.start ? new Date(event.start).toISOString().split('T')[0] : 'Unknown');
 
-  const getStatusLabel = () => {
-    if (!event?.scheduledTimeIn) return null;
-    if (!timeIn) {
-      const isPast = new Date() > new Date(`${displayDate}T${event.scheduledTimeOut || '23:59'}:00`);
-      return isPast ? "Absent" : "Pending";
-    }
-    if (timeIn > event.scheduledTimeIn) return "Late";
-    return "On Time";
-  };
-  const statusLabel = getStatusLabel();
+  const statusLabel = getEventStatus(
+    timeIn,
+    timeOut,
+    event?.scheduledTimeIn,
+    event?.scheduledTimeOut,
+    displayDate
+  );
 
   const eventName = event.title ? event.title.split(" - ")[0] : "";
   const isOwnSchedule = authName && eventName && authName.toLowerCase() === eventName.toLowerCase();
   const canLogTime = userRole === 'user' && isOwnSchedule;
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const isToday = displayDate === todayStr;
 
   return (
     <Overlay>
@@ -62,7 +64,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
               <strong>Scheduled Time:</strong> {event.scheduledTimeIn} - {event.scheduledTimeOut || '?'}
             </div>
             {statusLabel && (
-              <div style={{ marginTop: '8px', fontSize: '16px', fontWeight: 'bold', color: statusLabel === 'Late' || statusLabel === 'Absent' ? '#ef4444' : (statusLabel === 'On Time' ? '#22c55e' : '#f59e0b') }}>
+              <div style={{ marginTop: '8px', fontSize: '16px', fontWeight: 'bold', color: statusLabel.includes('Late') || statusLabel.includes('Absent') || statusLabel.includes('Early Timeout') ? '#ef4444' : (statusLabel.includes('On Time') ? '#22c55e' : '#f59e0b') }}>
                 Status: {statusLabel}
               </div>
             )}
@@ -76,6 +78,9 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
             </div>
             <div style={{ fontSize: '15px', color: '#334155' }}>
               <strong>Actual Time Out:</strong> <span style={{ color: timeOut ? '#0f172a' : '#94a3b8' }}>{timeOut || 'Not logged yet'}</span>
+              {timeOut && event.scheduledTimeOut && timeOut < event.scheduledTimeOut && (
+                <span style={{ color: '#ef4444', fontSize: '13px', marginLeft: '6px', fontWeight: 'bold' }}>(Early Timeout)</span>
+              )}
             </div>
             
             {!isOwnSchedule && userRole === 'user' && (
@@ -86,12 +91,17 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
           </div>
         ) : (
           <div style={{ marginTop: '10px', marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {!isToday && (
+              <div style={{ padding: '10px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#ef4444', fontSize: '14px', fontWeight: 'bold', textAlign: 'center' }}>
+                ⏳ You can only log time exactly on {displayDate}.
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '15px', color: '#475569' }}>
                 <strong>Actual Time In:</strong><br/>{timeIn || 'Not logged yet'}
               </div>
               {!timeIn ? (
-                <Button style={{ margin: 0, padding: '8px 16px', fontSize: '14px' }} primary disabled={isVerifying} onClick={async () => {
+                <Button style={{ margin: 0, padding: '8px 16px', fontSize: '14px' }} primary disabled={isVerifying || !isToday} title={!isToday ? "You can only log time on the exact scheduled date" : ""} onClick={async () => {
                   setLocationError('');
                   setIsVerifying(true);
                   const result = await verifyLocation();
@@ -115,9 +125,12 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '15px', color: '#475569' }}>
                 <strong>Actual Time Out:</strong><br/>{timeOut || 'Not logged yet'}
+                {timeOut && event.scheduledTimeOut && timeOut < event.scheduledTimeOut && (
+                  <span style={{ color: '#ef4444', fontSize: '13px', marginLeft: '6px', fontWeight: 'bold' }}>(Early)</span>
+                )}
               </div>
               {!timeOut ? (
-                <Button style={{ margin: 0, padding: '8px 16px', fontSize: '14px' }} primary={!!timeIn} disabled={!timeIn || isVerifying} onClick={async () => {
+                <Button style={{ margin: 0, padding: '8px 16px', fontSize: '14px' }} primary={!!timeIn} disabled={!timeIn || isVerifying || !isToday} title={!isToday ? "You can only log time on the exact scheduled date" : ""} onClick={async () => {
                   setLocationError('');
                   setIsVerifying(true);
                   const result = await verifyLocation();
@@ -146,16 +159,25 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
           </div>
         )}
 
-        <Label>Status:</Label>
-        <CheckboxLabel style={{ cursor: userRole === 'user' ? 'not-allowed' : 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={isConfirmed}
-            onChange={(e) => setIsConfirmed(e.target.checked)}
-            disabled={userRole === 'user'}
-          />
-          Shift Confirmed?
-        </CheckboxLabel>
+        {userRole === 'admin' ? (
+          <>
+            <Label>Admin Status:</Label>
+            <CheckboxLabel style={{ cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={isConfirmed}
+                onChange={(e) => setIsConfirmed(e.target.checked)}
+              />
+              Mark as Shift Confirmed
+            </CheckboxLabel>
+          </>
+        ) : (
+          isConfirmed && (
+            <div style={{ marginTop: '16px', padding: '12px', background: '#dcfce7', color: '#166534', borderRadius: '8px', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', fontWeight: 'bold' }}>
+              <span style={{ marginRight: '8px', fontSize: '18px' }}>✅</span> This shift has been officially confirmed by an administrator.
+            </div>
+          )
+        )}
 
         {userRole === 'user' && (
           <div style={{ marginTop: '16px', fontSize: '13px', color: '#64748b', textAlign: 'center', padding: '10px', background: '#f8fafc', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>

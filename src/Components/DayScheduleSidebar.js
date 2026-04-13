@@ -25,7 +25,14 @@ function DayScheduleSidebar({ selectedDate, events, onClose, onAddNew }) {
                 <div className="title">{event.title}</div>
                 {event.scheduledTimeIn && <div className="time" style={{color: '#64748b', marginBottom: '4px'}}>Sched: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
                 {event.timeIn && <div className="time">In: {event.timeIn}</div>}
-                {event.timeOut && <div className="time">Out: {event.timeOut}</div>}
+                {event.timeOut && (
+                  <div className="time">
+                    Out: {event.timeOut}
+                    {event.scheduledTimeOut && event.timeOut < event.scheduledTimeOut && (
+                      <span style={{ color: '#ef4444', fontSize: '13px', marginLeft: '6px', fontWeight: 'bold' }}>(Early)</span>
+                    )}
+                  </div>
+                )}
               </EventItem>
             ))}
           </EventList>

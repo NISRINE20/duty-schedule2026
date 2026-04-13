@@ -25,6 +25,7 @@ function TemplatesPage() {
     Sunday: [{ name: '', shift: '', timeIn: '', timeOut: '' }],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [showConfirmModal, setShowConfirmModal] = useState({ open: false, title: '', message: '', isError: false });
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -46,9 +47,9 @@ function TemplatesPage() {
     setIsLoading(true);
     try {
       await setDoc(doc(db, 'config', 'templates'), templates);
-      alert("Templates saved successfully!");
+      setShowConfirmModal({ open: true, title: 'Success', message: 'Templates configuration saved successfully!', isError: false });
     } catch (e) {
-      alert("Error saving templates: " + e.message);
+      setShowConfirmModal({ open: true, title: 'Error', message: `Error saving templates: ${e.message}`, isError: true });
     } finally {
       setIsLoading(false);
     }
@@ -165,9 +166,9 @@ function TemplatesPage() {
           }
         }
       }
-      alert(`Template applied! Added ${addedCount} new shifts.`);
+      setShowConfirmModal({ open: true, title: 'Template Applied', message: `Successfully generated and added ${addedCount} new scheduled shifts to the calendar!`, isError: false });
     } catch (e) {
-      alert("Error applying templates: " + e.message);
+      setShowConfirmModal({ open: true, title: 'Error', message: `Failed to apply templates: ${e.message}`, isError: true });
     } finally {
       setIsLoading(false);
     }
@@ -179,14 +180,14 @@ function TemplatesPage() {
       <Title>Monthly Schedule Templates</Title>
       <Description>Set default duties for each day of the week. Then apply to the current month.</Description>
       <TemplateForm>
-        {Object.keys(templates).map(day => (
+        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
           <DayCard key={day} $dayColor={DAY_COLORS[day]}>
             <DayHeader>
               <DayLabel>{day}</DayLabel>
               <AddButton onClick={() => addAssignment(day)}>+ Add Person</AddButton>
             </DayHeader>
             <AssignmentsArea>
-              {templates[day].map((assignment, index) => (
+              {(templates[day] || []).map((assignment, index) => (
                 <RowContainer key={index}>
                   <InputGroup>
                     <Input
@@ -226,7 +227,7 @@ function TemplatesPage() {
                   <RemoveButton onClick={() => removeAssignment(day, index)} title="Remove assignment">✕</RemoveButton>
                 </RowContainer>
               ))}
-              {templates[day].length === 0 && <span style={{color: '#94a3b8', fontStyle: 'italic', display: 'block', textAlign: 'center', padding: '16px 0'}}>No assignments yet.</span>}
+              {(!templates[day] || templates[day].length === 0) && <span style={{color: '#94a3b8', fontStyle: 'italic', display: 'block', textAlign: 'center', padding: '16px 0'}}>No assignments yet.</span>}
             </AssignmentsArea>
           </DayCard>
         ))}
@@ -235,6 +236,21 @@ function TemplatesPage() {
         <SaveButton onClick={saveTemplates}>Save Templates</SaveButton>
         <ApplyButton onClick={applyToMonth}>Apply Template to Current Month</ApplyButton>
       </ButtonContainer>
+
+      {showConfirmModal.open && (
+        <Overlay onClick={() => setShowConfirmModal({ ...showConfirmModal, open: false })}>
+          <ModalContainer onClick={(e) => e.stopPropagation()}>
+            <IconWrapper>
+              {showConfirmModal.isError ? "⚠️" : "✨"}
+            </IconWrapper>
+            <ModalTitle $isError={showConfirmModal.isError}>{showConfirmModal.title}</ModalTitle>
+            <ModalMessage>{showConfirmModal.message}</ModalMessage>
+            <CloseBtn onClick={() => setShowConfirmModal({ ...showConfirmModal, open: false })}>
+              Got it
+            </CloseBtn>
+          </ModalContainer>
+        </Overlay>
+      )}
     </Container>
   );
 }
@@ -449,5 +465,59 @@ const ApplyButton = styled.button`
   &:hover {
     background: #1d4ed8;
     transform: translateY(-2px);
+  }
+`;
+
+const Overlay = styled.div`
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+`;
+
+const ModalContainer = styled.div`
+  background: white;
+  padding: 32px 24px;
+  border-radius: 16px;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+`;
+
+const IconWrapper = styled.div`
+  font-size: 48px;
+  margin-bottom: 16px;
+`;
+
+const ModalTitle = styled.h2`
+  margin: 0 0 12px 0;
+  font-size: 24px;
+  color: ${props => props.$isError ? '#ef4444' : '#10b981'};
+`;
+
+const ModalMessage = styled.p`
+  margin: 0 0 24px 0;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1.5;
+`;
+
+const CloseBtn = styled.button`
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #1d4ed8;
   }
 `;

@@ -4,6 +4,7 @@ import CalendarPage from "./Pages/CalendarPage";
 import TemplatesPage from "./Pages/TemplatesPage";
 import LoginPage from "./Pages/LoginPage";
 import SignupPage from "./Pages/SignupPage";
+import SummaryPage from "./Pages/SummaryPage";
 import Navbar from "./Components/Navbar";
 import GlobalStyles from "./styles/GlobalStyles";
 import styled from "styled-components";
@@ -36,6 +37,7 @@ function App() {
           <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
           <Route path="/templates" element={<ProtectedRoute requiredRole="admin"><TemplatesPage /></ProtectedRoute>} />
+          <Route path="/summary" element={<ProtectedRoute requiredRole="admin"><SummaryPage /></ProtectedRoute>} />
         </Routes>
       </MainContent>
     </AppContainer>
