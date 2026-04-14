@@ -14,10 +14,23 @@ const GlobalStyles = createGlobalStyle`
 
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #f8fafc;
     color: #0f172a;
     -webkit-font-smoothing: antialiased;
     line-height: auto;
+    background-color: #f8fafc;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background-image: url('/logo.png');
+    background-size: min(80vw, 950px); /* Keeps it from blowing up massively, perfectly contained */
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.10; /* Lower opacity slightly so it's a cleaner watermark */
+    z-index: -1;
+    pointer-events: none;
   }
 
   /* Responsive generic headers to fix contextual sizing on mobile */

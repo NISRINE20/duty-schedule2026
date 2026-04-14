@@ -10,8 +10,13 @@ function LoginPage() {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState(null);
   const [userName, setUserName] = useState('');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState({ open: false, title: '', message: '', isError: false });
+
+  const handleModalClose = () => {
+    setShowConfirmModal({ ...showConfirmModal, open: false });
+  };
 
   const getPseudoEmail = (n) => {
     return n.trim().toLowerCase().replace(/[^a-z0-9]/g, '') + '@dutyschedule.local';
@@ -25,39 +30,40 @@ function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (userName.trim() === '') {
-      alert('Please enter your name');
+      setShowConfirmModal({ open: true, title: 'Missing Info', message: 'Please enter your name.', isError: true });
       return;
     }
-    if (password.trim() === '') {
-      alert('Please enter your password');
+    if (pin.trim() === '' || pin.length !== 4 || isNaN(pin)) {
+      setShowConfirmModal({ open: true, title: 'Invalid PIN', message: 'Please enter your exactly 4-digit PIN.', isError: true });
       return;
     }
 
     setIsLoading(true);
     try {
       const email = getPseudoEmail(userName);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+      const securePassword = pin + "00";
+      const userCredential = await signInWithEmailAndPassword(auth, email, securePassword);
+
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       if (userDoc.exists()) {
         const data = userDoc.data();
         if (data.role !== selectedRole) {
-          alert(`Login failed: You selected ${selectedRole} but your account role is ${data.role}.`);
+          setShowConfirmModal({ open: true, title: 'Role Mismatch', message: `Login failed: You selected ${selectedRole} but your account role is ${data.role}.`, isError: true });
           await auth.signOut();
           return;
         }
         handleLogin(data.role, data.name);
       } else {
-        alert("User profile not found in the database. Please contact an administrator.");
+        setShowConfirmModal({ open: true, title: 'Profile Not Found', message: "User profile not found in the database. Please contact an administrator.", isError: true });
         await auth.signOut();
       }
     } catch (error) {
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        alert("Incorrect Name or Password. Please try again or create an account.");
+        setShowConfirmModal({ open: true, title: 'Login Failed', message: "Incorrect Name or PIN. Please try again or create an account.", isError: true });
       } else {
-        alert("Login Error: " + error.message);
+        setShowConfirmModal({ open: true, title: 'Login Error', message: "Login Error: " + error.message, isError: true });
       }
     } finally {
       setIsLoading(false);
@@ -67,7 +73,7 @@ function LoginPage() {
   const resetForm = () => {
     setSelectedRole(null);
     setUserName('');
-    setPassword('');
+    setPin('');
   };
 
   return (
@@ -76,7 +82,7 @@ function LoginPage() {
       <LoginCard>
         <Title>Duty Schedule System</Title>
         <Subtitle>Please select your role to continue</Subtitle>
-        
+
         {!selectedRole ? (
           <RolesContainer>
             <RoleCard onClick={() => setSelectedRole('admin')}>
@@ -84,7 +90,7 @@ function LoginPage() {
               <RoleTitle>Admin</RoleTitle>
               <RoleDescription>Manage schedules, templates, and users</RoleDescription>
             </RoleCard>
-            
+
             <RoleCard onClick={() => setSelectedRole('user')}>
               <Icon>👤</Icon>
               <RoleTitle>User</RoleTitle>
@@ -96,35 +102,52 @@ function LoginPage() {
             <Icon>{selectedRole === 'admin' ? '🛡️' : '👤'}</Icon>
             <RoleTitle>{selectedRole === 'admin' ? 'Admin Login' : 'User Login'}</RoleTitle>
             <RoleDescription style={{ marginBottom: '24px' }}>
-              Please enter your name and password to continue.
+              Please enter your name and 4-digit PIN to continue.
             </RoleDescription>
-            
-            <Input 
+
+            <Input
               autoFocus
-              type="text" 
-              placeholder="Name (e.g., John Doe)" 
+              type="text"
+              placeholder="Name (e.g., John Doe)"
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
             />
-            
-            <Input 
-              type="password" 
-              placeholder="Password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+
+            <Input
+              type="password"
+              maxLength="4"
+              inputMode="numeric"
+              placeholder="4-Digit PIN"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
             />
-            
+
             <ButtonGroup>
               <Button type="button" onClick={resetForm}>Back</Button>
               <Button primary type="submit">Login</Button>
             </ButtonGroup>
           </UserForm>
         )}
-        
+
         <FooterText>
           Don't have an account? <Link to="/signup">Create One</Link>
         </FooterText>
       </LoginCard>
+
+      {showConfirmModal.open && (
+        <Overlay onClick={handleModalClose}>
+          <ModalContainer onClick={(e) => e.stopPropagation()}>
+            <IconWrapper>
+              {showConfirmModal.isError ? "⚠️" : "✨"}
+            </IconWrapper>
+            <ModalTitle $isError={showConfirmModal.isError}>{showConfirmModal.title}</ModalTitle>
+            <ModalMessage>{showConfirmModal.message}</ModalMessage>
+            <CloseBtn onClick={handleModalClose}>
+              Got it
+            </CloseBtn>
+          </ModalContainer>
+        </Overlay>
+      )}
     </PageContainer>
   );
 }
@@ -138,11 +161,14 @@ const PageContainer = styled.div`
   justify-content: center;
   min-height: 100vh;
   width: 100%;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  background: transparent;
 `;
 
 const LoginCard = styled.div`
-  background: white;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 20px;
   padding: 40px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -307,5 +333,69 @@ const FooterText = styled.p`
     &:hover {
       text-decoration: underline;
     }
+  }
+`;
+
+const Overlay = styled.div`
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`;
+
+const ModalContainer = styled.div`
+  background: white;
+  padding: 32px 24px;
+  border-radius: 16px;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+`;
+
+const IconWrapper = styled.div`
+  font-size: 48px;
+  margin-bottom: 16px;
+`;
+
+const ModalTitle = styled.h2`
+  margin: 0 0 12px 0;
+  font-size: 24px;
+  color: ${props => props.$isError ? '#ef4444' : '#10b981'};
+`;
+
+const ModalMessage = styled.p`
+  margin: 0 0 24px 0;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1.5;
+`;
+
+const CloseBtn = styled.button`
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #1d4ed8;
   }
 `;

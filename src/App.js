@@ -47,7 +47,7 @@ function App() {
 const AppContainer = styled.div`
   display: flex;
   min-height: 100vh;
-  background: #f8fafc;
+  background: transparent;
 `;
 
 const MainContent = styled.div`

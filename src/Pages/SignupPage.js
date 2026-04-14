@@ -3,16 +3,23 @@ import { useNavigate, Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { auth, db } from '../firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import Loader from '../Components/Loader';
 
 function SignupPage() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [role, setRole] = useState('user');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState({ open: false, title: '', message: '', isError: false });
+
+  const handleModalClose = () => {
+    const isSuccess = !showConfirmModal.isError && showConfirmModal.title === 'Account Created';
+    setShowConfirmModal({ ...showConfirmModal, open: false });
+    if (isSuccess) navigate('/login');
+  };
 
   const getPseudoEmail = (n) => {
     return n.trim().toLowerCase().replace(/[^a-z0-9]/g, '') + '@dutyschedule.local';
@@ -21,13 +28,18 @@ function SignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!name.trim() || !password || !confirmPassword) {
-      alert("Please fill out all fields.");
+    if (!name.trim() || !pin || !confirmPin) {
+      setShowConfirmModal({ open: true, title: 'Missing Info', message: 'Please fill out all fields.', isError: true });
       return;
     }
 
-    if (password !== confirmPassword) {
-      alert("Passwords do not match.");
+    if (pin.length !== 4 || isNaN(pin)) {
+      setShowConfirmModal({ open: true, title: 'Invalid PIN', message: 'Please enter exactly 4 digits for your PIN.', isError: true });
+      return;
+    }
+
+    if (pin !== confirmPin) {
+      setShowConfirmModal({ open: true, title: 'Mismatch', message: 'PINs do not match.', isError: true });
       return;
     }
 
@@ -35,7 +47,19 @@ function SignupPage() {
 
     setIsLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      if (role === 'admin') {
+        const adminQuery = query(collection(db, 'users'), where('role', '==', 'admin'));
+        const adminSnapshot = await getDocs(adminQuery);
+        if (!adminSnapshot.empty) {
+          setIsLoading(false);
+          setShowConfirmModal({ open: true, title: 'Restriction', message: 'An Administrator account already exists. Only one Admin is allowed per system.', isError: true });
+          return;
+        }
+      }
+
+      // Firebase requires 6 characters for a password. We seamlessly append '00' behind the scenes.
+      const securePassword = pin + "00";
+      const userCredential = await createUserWithEmailAndPassword(auth, email, securePassword);
       const user = userCredential.user;
 
       await setDoc(doc(db, 'users', user.uid), {
@@ -45,13 +69,12 @@ function SignupPage() {
         createdAt: new Date().toISOString()
       });
 
-      alert("Account created successfully! You can now log in.");
-      navigate('/login');
+      setShowConfirmModal({ open: true, title: 'Account Created', message: 'Your account was created successfully! You can now log in.', isError: false });
     } catch (error) {
       if (error.code === 'auth/email-already-in-use') {
-        alert("An account with this name already exists. Please choose another name or login.");
+        setShowConfirmModal({ open: true, title: 'Name Taken', message: 'An account with this name already exists. Please choose another name or login.', isError: true });
       } else {
-        alert("Error creating account: " + error.message);
+        setShowConfirmModal({ open: true, title: 'Error', message: 'Error creating account: ' + error.message, isError: true });
       }
     } finally {
       setIsLoading(false);
@@ -85,22 +108,26 @@ function SignupPage() {
           </FormGroup>
 
           <FormGroup>
-            <Label>Password</Label>
+            <Label>4-Digit PIN</Label>
             <Input
               type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              maxLength="4"
+              inputMode="numeric"
+              placeholder="Enter 4-digit PIN"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
             />
           </FormGroup>
 
           <FormGroup>
-            <Label>Confirm Password</Label>
+            <Label>Confirm PIN</Label>
             <Input
               type="password"
-              placeholder="Retype password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              maxLength="4"
+              inputMode="numeric"
+              placeholder="Retype 4-digit PIN"
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value)}
             />
           </FormGroup>
 
@@ -111,6 +138,21 @@ function SignupPage() {
           Already have an account? <Link to="/login">Log in here</Link>
         </FooterText>
       </LoginCard>
+
+      {showConfirmModal.open && (
+        <Overlay onClick={handleModalClose}>
+          <ModalContainer onClick={(e) => e.stopPropagation()}>
+            <IconWrapper>
+              {showConfirmModal.isError ? "⚠️" : "✨"}
+            </IconWrapper>
+            <ModalTitle $isError={showConfirmModal.isError}>{showConfirmModal.title}</ModalTitle>
+            <ModalMessage>{showConfirmModal.message}</ModalMessage>
+            <CloseBtn onClick={handleModalClose}>
+              Got it
+            </CloseBtn>
+          </ModalContainer>
+        </Overlay>
+      )}
     </PageContainer>
   );
 }
@@ -124,11 +166,14 @@ const PageContainer = styled.div`
   justify-content: center;
   min-height: 100vh;
   width: 100%;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  background: transparent;
 `;
 
 const LoginCard = styled.div`
-  background: white;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 20px;
   padding: 40px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -258,5 +303,69 @@ const FooterText = styled.p`
     &:hover {
       text-decoration: underline;
     }
+  }
+`;
+
+const Overlay = styled.div`
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`;
+
+const ModalContainer = styled.div`
+  background: white;
+  padding: 32px 24px;
+  border-radius: 16px;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+`;
+
+const IconWrapper = styled.div`
+  font-size: 48px;
+  margin-bottom: 16px;
+`;
+
+const ModalTitle = styled.h2`
+  margin: 0 0 12px 0;
+  font-size: 24px;
+  color: ${props => props.$isError ? '#ef4444' : '#10b981'};
+`;
+
+const ModalMessage = styled.p`
+  margin: 0 0 24px 0;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1.5;
+`;
+
+const CloseBtn = styled.button`
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #1d4ed8;
   }
 `;

@@ -82,7 +82,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                 <span style={{ color: '#ef4444', fontSize: '13px', marginLeft: '6px', fontWeight: 'bold' }}>(Early Timeout)</span>
               )}
             </div>
-            
+
             {!isOwnSchedule && userRole === 'user' && (
               <div style={{ marginTop: '12px', color: '#ef4444', fontSize: '14px', fontWeight: 'bold' }}>
                 You can only log time for your own assigned schedules.
@@ -98,7 +98,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
             )}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '15px', color: '#475569' }}>
-                <strong>Actual Time In:</strong><br/>{timeIn || 'Not logged yet'}
+                <strong>Actual Time In:</strong><br />{timeIn || 'Not logged yet'}
               </div>
               {!timeIn ? (
                 <Button style={{ margin: 0, padding: '8px 16px', fontSize: '14px' }} primary disabled={isVerifying || !isToday} title={!isToday ? "You can only log time on the exact scheduled date" : ""} onClick={async () => {
@@ -106,7 +106,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                   setIsVerifying(true);
                   const result = await verifyLocation();
                   setIsVerifying(false);
-                  
+
                   if (!result.allowed) {
                     setLocationError(result.error || `Verification failed: You are ${result.distance} meters away.`);
                     return;
@@ -124,7 +124,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '15px', color: '#475569' }}>
-                <strong>Actual Time Out:</strong><br/>{timeOut || 'Not logged yet'}
+                <strong>Actual Time Out:</strong><br />{timeOut || 'Not logged yet'}
                 {timeOut && event.scheduledTimeOut && timeOut < event.scheduledTimeOut && (
                   <span style={{ color: '#ef4444', fontSize: '13px', marginLeft: '6px', fontWeight: 'bold' }}>(Early)</span>
                 )}
@@ -135,7 +135,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                   setIsVerifying(true);
                   const result = await verifyLocation();
                   setIsVerifying(false);
-                  
+
                   if (!result.allowed) {
                     setLocationError(result.error || `Verification failed: You are ${result.distance} meters away.`);
                     return;
@@ -150,7 +150,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                 <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ Recorded</span>
               )}
             </div>
-            
+
             {locationError && (
               <div style={{ color: '#ef4444', fontSize: '14px', fontWeight: 'bold', background: '#fef2f2', padding: '10px', borderRadius: '6px', border: '1px solid #fca5a5' }}>
                 📍 {locationError}
@@ -187,8 +187,8 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
 
         <ButtonGroup>
           {userRole === 'admin' && onDelete && !showConfirm && (
-            <Button 
-              style={{ backgroundColor: '#ef4444', color: 'white', marginRight: 'auto' }} 
+            <Button
+              style={{ backgroundColor: '#ef4444', color: 'white', marginRight: 'auto' }}
               onClick={(e) => {
                 e.preventDefault();
                 setShowConfirm(true);
@@ -198,8 +198,8 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
             </Button>
           )}
           {userRole === 'admin' && onDelete && showConfirm && (
-            <Button 
-              style={{ backgroundColor: '#7f1d1d', color: 'white', marginRight: 'auto', border: '2px solid red' }} 
+            <Button
+              style={{ backgroundColor: '#7f1d1d', color: 'white', marginRight: 'auto', border: '2px solid red' }}
               onClick={(e) => {
                 e.preventDefault();
                 onDelete();
