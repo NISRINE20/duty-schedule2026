@@ -8,6 +8,7 @@ import { db } from '../firebase';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import Loader from '../Components/Loader';
 
+
 const USER_COLORS = [
   "#bae6fd", // sky blue
   "#bbf7d0", // green
@@ -109,6 +110,8 @@ function DashboardPage() {
     });
   }, [events]);
 
+  const pendingLeaves = useMemo(() => events.filter(e => e.isLeaveRequestPending), [events]);
+
 
   const handleCardClick = (eventData) => {
     setSelectedEvent(eventData);
@@ -165,9 +168,9 @@ function DashboardPage() {
             title="System Alerts"
           >
             <BellIcon />
-            {(unassigned.length + overlapping.length + upcomingHour.length) > 0 && (
+            {(unassigned.length + overlapping.length + upcomingHour.length + pendingLeaves.length) > 0 && (
               <span style={{ position: 'absolute', top: '0', right: '-2px', background: '#ef4444', color: 'white', borderRadius: '10px', minWidth: '18px', padding: '2px 4px', fontSize: '11px', fontWeight: 'bold', border: '2px solid #f8fafc', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
-                {unassigned.length + overlapping.length + upcomingHour.length}
+                {unassigned.length + overlapping.length + upcomingHour.length + pendingLeaves.length}
               </span>
             )}
           </button>
@@ -205,19 +208,33 @@ function DashboardPage() {
             ) : (
               filteredEvents.map((event) => {
                 const [name, shift] = (event.title || "").split(" - ");
+                const isLeave = event.isLeave;
                 return (
-                  <Card key={event.id} color={getColorForName(name)} onClick={() => handleCardClick(event)}>
+                  <Card key={event.id} color={isLeave ? "#e2e8f0" : getColorForName(name)} onClick={() => handleCardClick(event)}>
                     <CardHeader>
                       <strong>{name}</strong>
-                      <StatusBadge $confirmed={event.isConfirmed}>
-                        {event.isConfirmed ? "✅ Confirmed" : "Pending"}
-                      </StatusBadge>
+                      {!isLeave && !event.isLeaveRequestPending && (
+                        <StatusBadge $confirmed={event.isConfirmed}>
+                          {event.isConfirmed ? "✅ Confirmed" : "Pending"}
+                        </StatusBadge>
+                      )}
+                      {event.isLeaveRequestPending && (
+                        <StatusBadge $confirmed={false} style={{ background: '#fffbeb', color: '#d97706', borderColor: '#fde68a' }}>
+                          ⏳ Leave Requested
+                        </StatusBadge>
+                      )}
                     </CardHeader>
-                    <div>{shift}</div>
-                    <div>{event.date}</div>
-                    {event.scheduledTimeIn && <div style={{fontSize: '14px', color:'#666'}}>Scheduled: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
-                    {event.timeIn && <div>In: {event.timeIn}</div>}
-                    {event.timeOut && <div>Out: {event.timeOut}</div>}
+                    {isLeave ? (
+                      <div><strong>Excused:</strong> {event.leaveType}</div>
+                    ) : (
+                      <>
+                        <div>{shift}</div>
+                        <div>{event.date}</div>
+                        {event.scheduledTimeIn && <div style={{fontSize: '14px', color:'#666'}}>Scheduled: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
+                        {event.timeIn && <div>In: {event.timeIn}</div>}
+                        {event.timeOut && <div>Out: {event.timeOut}</div>}
+                      </>
+                    )}
                   </Card>
                 );
               })
@@ -229,18 +246,32 @@ function DashboardPage() {
       <SectionTitle>Today on Duty ({today})</SectionTitle>
       <CardGrid>{todaysDuties.length===0 ? <Card>No duty assigned today</Card> : todaysDuties.map((event) => {
         const [name, shift] = (event.title || "").split(" - ");
+        const isLeave = event.isLeave;
         return (
-          <Card key={event.id} color={getColorForName(name)} onClick={() => handleCardClick(event)}>
+          <Card key={event.id} color={isLeave ? "#e2e8f0" : getColorForName(name)} onClick={() => handleCardClick(event)}>
             <CardHeader>
               <strong>{name}</strong>
-              <StatusBadge $confirmed={event.isConfirmed}>
-                {event.isConfirmed ? "✅ Confirmed" : "Pending"}
-              </StatusBadge>
+              {!isLeave && !event.isLeaveRequestPending && (
+                <StatusBadge $confirmed={event.isConfirmed}>
+                  {event.isConfirmed ? "✅ Confirmed" : "Pending"}
+                </StatusBadge>
+              )}
+              {event.isLeaveRequestPending && (
+                <StatusBadge $confirmed={false} style={{ background: '#fffbeb', color: '#d97706', borderColor: '#fde68a' }}>
+                  ⏳ Leave Requested
+                </StatusBadge>
+              )}
             </CardHeader>
-            <div>{shift}</div>
-            {event.scheduledTimeIn && <div style={{fontSize: '14px', color:'#666'}}>Scheduled: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
-            {event.timeIn && <div>In: {event.timeIn}</div>}
-            {event.timeOut && <div>Out: {event.timeOut}</div>}
+            {isLeave ? (
+              <div><strong>Excused:</strong> {event.leaveType}</div>
+            ) : (
+              <>
+                <div>{shift}</div>
+                {event.scheduledTimeIn && <div style={{fontSize: '14px', color:'#666'}}>Scheduled: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
+                {event.timeIn && <div>In: {event.timeIn}</div>}
+                {event.timeOut && <div>Out: {event.timeOut}</div>}
+              </>
+            )}
           </Card>
         );
       })}</CardGrid>
@@ -249,7 +280,7 @@ function DashboardPage() {
       <UpcomingList>{next7Days.map(({ date, duties }) => (
         <UpcomingItem key={date}>
           <strong>{date}</strong> - {duties.length} duties
-          {duties.map((d) => <div key={`${d.id}-upcoming`} style={{fontSize:'0.85em'}}>{d.title} {d.scheduledTimeIn ? `| Sched: ${d.scheduledTimeIn}-${d.scheduledTimeOut}` : ''} {d.timeIn && `| In:${d.timeIn}`} {d.timeOut && `| Out:${d.timeOut}`}</div>)}
+          {duties.map((d) => <div key={`${d.id}-upcoming`} style={{fontSize:'0.85em', padding: '4px 0'}}>{d.isLeave ? `${d.title.split(" - ")[0]} - Excused (${d.leaveType})` : `${d.title} ${d.scheduledTimeIn ? `| Sched: ${d.scheduledTimeIn}-${d.scheduledTimeOut}` : ''} ${d.timeIn ? `| In:${d.timeIn}` : ''} ${d.timeOut ? `| Out:${d.timeOut}` : ''}`}</div>)}
         </UpcomingItem>
       ))}</UpcomingList>
 
@@ -259,10 +290,10 @@ function DashboardPage() {
         isOpen={timeLogOpen}
         onClose={() => setTimeLogOpen(false)}
         event={selectedEvent}
-        onSave={async ({ timeIn, timeOut, isConfirmed }) => {
+        onSave={async (updates) => {
           setIsLoading(true);
           try {
-            await updateDoc(doc(db, 'dutyEvents', selectedEvent.id), { timeIn, timeOut, isConfirmed });
+            await updateDoc(doc(db, 'dutyEvents', selectedEvent.id), updates);
             setTimeLogOpen(false);
           } catch (e) {
             alert("Error saving log: " + e.message);
@@ -297,6 +328,29 @@ function DashboardPage() {
               </button>
             </div>
             
+            {pendingLeaves.length > 0 && (
+              <AlertCard style={{ background: '#fffbeb', color: '#d97706', borderColor: '#fde68a', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                  <div>Pending Leave Requests: {pendingLeaves.length}</div>
+                  <div style={{ marginTop: '12px', fontSize: '16px', fontWeight: 'normal' }}>
+                    {pendingLeaves.map(e => (
+                      <div 
+                        key={e.id} 
+                        style={{ marginBottom: '6px', color: '#b45309', cursor: 'pointer' }}
+                        onClick={() => {
+                          setAlertsOpen(false);
+                          navigate('/calendar', { state: { openEventId: e.id } });
+                        }}
+                        onMouseOver={(ev) => ev.currentTarget.style.textDecoration = 'underline'}
+                        onMouseOut={(ev) => ev.currentTarget.style.textDecoration = 'none'}
+                      >
+                        • <strong>{e.title ? e.title.split(' - ')[0] : 'Unknown User'}</strong> requested for {e.date}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </AlertCard>
+            )}
             <AlertCard>{unassigned.length ? `Unassigned shifts: ${unassigned.length}` : "No unassigned shifts"}</AlertCard>
             <AlertCard>{overlapping.length ? `Overlapping shifts: ${overlapping.length}` : "No overlapping shifts"}</AlertCard>
             <AlertCard>{upcomingHour.length ? `Upcoming within 1 hour: ${upcomingHour.length}` : "No upcoming duties in 1 hour"}</AlertCard>

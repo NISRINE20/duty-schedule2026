@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -11,7 +12,9 @@ import { db } from '../firebase';
 import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import Loader from '../Components/Loader';
 
+
 function CalendarPage() {
+  const location = useLocation();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [events, setEvents] = useState([]);
@@ -44,6 +47,18 @@ function CalendarPage() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (location.state && location.state.openEventId && events.length > 0) {
+      const match = events.find(e => String(e.id) === String(location.state.openEventId));
+      if (match) {
+        setSelectedDate(match.date);
+        setSelectedEvent(match);
+        setTimeLogOpen(true);
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [events, location.state]);
+
   console.log('Rendering CalendarPage, modalOpen:', modalOpen, 'selectedDate:', selectedDate);
 
   const handleDateClick = (info) => {
@@ -52,31 +67,80 @@ function CalendarPage() {
 
   const formattedEvents = events.map((e) => {
     const name = e.title ? e.title.split(" - ")[0] : "";
-    const bgColor = getColorForName(name);
+    const bgColor = e.isLeave ? "#94a3b8" : getColorForName(name);
 
-    const titleStatus = e.isConfirmed ? `✅ ${e.title}` : e.title;
+    let titleStatus = e.title;
+    if (e.isLeave) {
+      titleStatus = `${name} - ${e.leaveType}`;
+    } else if (e.isConfirmed) {
+      titleStatus = `✅ ${e.title}`;
+    } else if (e.leaveRequestDenied) {
+      titleStatus = `❌ ${e.title}`;
+    } else if (e.isLeaveRequestPending) {
+      titleStatus = `⏳ ${e.title}`;
+    }
 
-    return {
+    let eventProps = {
       ...e,
+      start: e.date,
       title: titleStatus,
       backgroundColor: bgColor,
       borderColor: bgColor,
-      textColor: "#0f172a",
+      textColor: e.isLeave ? "#ffffff" : "#0f172a",
     };
+
+    if (e.isOvernight && e.date) {
+      const d = new Date(e.date);
+      // FullCalendar's all-day 'end' is exclusive, meaning we need to add 2 days to span exactly 2 boxes (today and tomorrow).
+      d.setDate(d.getDate() + 2);
+      eventProps.end = d.toISOString().split('T')[0];
+    }
+
+    return eventProps;
   });
 
-  const handleSave = async ({ name, shift, scheduledTimeIn, scheduledTimeOut }) => {
+  const handleSave = async ({ name, shift, scheduledTimeIn, scheduledTimeOut, isRepeating, selectedDays, untilDate, isLeave, leaveType }) => {
     setIsLoading(true);
     try {
-      await addDoc(collection(db, 'dutyEvents'), {
-        title: `${name} - ${shift}`,
-        date: selectedDate,
-        timeIn: "",
-        timeOut: "",
-        scheduledTimeIn: scheduledTimeIn || "",
-        scheduledTimeOut: scheduledTimeOut || "",
-        isConfirmed: false
-      });
+      const isOvernight = scheduledTimeOut && scheduledTimeIn ? scheduledTimeOut <= scheduledTimeIn : false;
+      const datesToCreate = [];
+
+      if (isRepeating && untilDate && selectedDays.length > 0) {
+        let current = new Date(selectedDate);
+        const end = new Date(untilDate);
+        
+        while (current <= end) {
+          if (selectedDays.includes(current.getDay())) {
+            datesToCreate.push(current.toISOString().split('T')[0]);
+          }
+          current.setDate(current.getDate() + 1);
+        }
+      } else {
+        datesToCreate.push(selectedDate);
+      }
+
+      if (datesToCreate.length === 0) {
+        alert("The selected range doesn't include any of the chosen days.");
+        setIsLoading(false);
+        return;
+      }
+
+      const promises = datesToCreate.map(date => 
+        addDoc(collection(db, 'dutyEvents'), {
+          title: `${name} - ${shift}`,
+          date: date,
+          timeIn: "",
+          timeOut: "",
+          scheduledTimeIn: scheduledTimeIn || "",
+          scheduledTimeOut: scheduledTimeOut || "",
+          isConfirmed: false,
+          isOvernight: isOvernight,
+          isLeave: isLeave || false,
+          leaveType: leaveType || ""
+        })
+      );
+
+      await Promise.all(promises);
       setModalOpen(false);
     } catch (e) {
       alert("Error adding event: " + e.message);
@@ -136,11 +200,11 @@ function CalendarPage() {
         isOpen={timeLogOpen}
         onClose={() => setTimeLogOpen(false)}
         event={selectedEvent}
-        onSave={async ({ timeIn, timeOut, isConfirmed }) => {
+        onSave={async (updates) => {
           setIsLoading(true);
           try {
-            await updateDoc(doc(db, 'dutyEvents', selectedEvent.id), { timeIn, timeOut, isConfirmed });
-            setSelectedEvent(prev => ({ ...prev, timeIn, timeOut, isConfirmed }));
+            await updateDoc(doc(db, 'dutyEvents', selectedEvent.id), updates);
+            setSelectedEvent(prev => ({ ...prev, ...updates }));
           } catch (e) {
             alert("Error saving: " + e.message);
           } finally {

@@ -2,7 +2,19 @@ import React from "react";
 import styled from "styled-components";
 
 function DayScheduleSidebar({ selectedDate, events, onClose, onAddNew }) {
-  const dayEvents = events.filter(event => event.date === selectedDate);
+  const dayEvents = events.filter(event => {
+    if (event.date === selectedDate) return true;
+    
+    if (event.isOvernight && event.date) {
+      const d = new Date(event.date);
+      d.setDate(d.getDate() + 1);
+      const nextDayStr = d.toISOString().split('T')[0];
+      if (nextDayStr === selectedDate) return true;
+    }
+    
+    return false;
+  });
+
   const userRole = localStorage.getItem('authRole');
   
   const today = new Date();
@@ -22,15 +34,19 @@ function DayScheduleSidebar({ selectedDate, events, onClose, onAddNew }) {
           <EventList>
             {dayEvents.map((event, index) => (
               <EventItem key={index}>
-                <div className="title">{event.title}</div>
-                {event.scheduledTimeIn && <div className="time" style={{color: '#64748b', marginBottom: '4px'}}>Sched: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
+                <div className="title">
+                  {event.title}
+                  {event.isOvernight && event.date !== selectedDate && (
+                    <span style={{ fontSize: '12px', background: '#e0f2fe', color: '#0369a1', padding: '4px 8px', borderRadius: '6px', marginLeft: '8px', fontWeight: 'bold' }}>
+                      (Overnight)
+                    </span>
+                  )}
+                </div>
+                {event.scheduledTimeIn && <div className="time" style={{color: '#64748b', marginBottom: '4px'}}>Sched: {event.scheduledTimeIn} - {event.scheduledTimeOut || '?'}</div>}
                 {event.timeIn && <div className="time">In: {event.timeIn}</div>}
                 {event.timeOut && (
                   <div className="time">
                     Out: {event.timeOut}
-                    {event.scheduledTimeOut && event.timeOut < event.scheduledTimeOut && (
-                      <span style={{ color: '#ef4444', fontSize: '13px', marginLeft: '6px', fontWeight: 'bold' }}>(Early)</span>
-                    )}
                   </div>
                 )}
               </EventItem>

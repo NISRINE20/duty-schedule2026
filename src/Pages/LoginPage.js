@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { STORAGE_KEYS } from '../constants';
 import Loader from '../Components/Loader';
 
 function LoginPage() {
@@ -23,8 +24,8 @@ function LoginPage() {
   };
 
   const handleLogin = (role, name = '') => {
-    localStorage.setItem('authRole', role);
-    if (name) localStorage.setItem('authName', name);
+    localStorage.setItem(STORAGE_KEYS.AUTH_ROLE, role);
+    if (name) localStorage.setItem(STORAGE_KEYS.AUTH_NAME, name);
     navigate('/');
   };
 

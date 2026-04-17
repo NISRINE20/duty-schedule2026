@@ -34,7 +34,16 @@ function SummaryPage() {
     setSelectedDate(info.dateStr);
   };
 
-  const dayEvents = events.filter(e => e.date === selectedDate);
+  const dayEvents = events.filter(event => {
+    if (event.date === selectedDate) return true;
+    if (event.isOvernight && event.date) {
+      const d = new Date(event.date);
+      d.setDate(d.getDate() + 1);
+      const nextDayStr = d.toISOString().split('T')[0];
+      if (nextDayStr === selectedDate) return true;
+    }
+    return false;
+  });
 
   const getStatusColor = (status) => {
     if (!status) return '#64748b';
@@ -44,24 +53,39 @@ function SummaryPage() {
     return '#64748b';
   };
 
+  const getDisplayDate = (event) => {
+    if (!event.date) return 'Unknown';
+    if (event.isOvernight) {
+      const d = new Date(event.date);
+      d.setDate(d.getDate() + 1);
+      const nextDayStr = d.toISOString().split('T')[0];
+      return `${event.date} to ${nextDayStr}`;
+    }
+    return event.date;
+  };
+
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.text(`Duty Summary for ${selectedDate}`, 14, 15);
     
-    const header = [["Name / Shift", "Scheduled", "Actual In", "Actual Out", "Status"]];
+    const header = [["Name / Shift", "Date", "Scheduled", "Actual In", "Actual Out", "Status"]];
     const data = dayEvents.map((event) => {
       const status = getEventStatus(
         event.timeIn,
         event.timeOut,
         event.scheduledTimeIn,
         event.scheduledTimeOut,
-        event.date
+        event.date,
+        event.isOvernight,
+        event.isLeave,
+        event.leaveType
       );
       const nameDisplay = event.title ? event.title : "Unknown";
       
       return [
         nameDisplay,
-        `${event.scheduledTimeIn || '?'} - ${event.scheduledTimeOut || '?'}`,
+        getDisplayDate(event),
+        event.isLeave ? 'Excused' : `${event.scheduledTimeIn || '?'} - ${event.scheduledTimeOut || '?'}`,
         event.timeIn || '-',
         event.timeOut || '-',
         status || 'Unknown'
@@ -124,6 +148,7 @@ function SummaryPage() {
               <thead>
                 <tr>
                   <th>Name / Shift</th>
+                  <th>Date</th>
                   <th>Scheduled</th>
                   <th>Actual In</th>
                   <th>Actual Out</th>
@@ -138,14 +163,25 @@ function SummaryPage() {
                       event.timeOut,
                       event.scheduledTimeIn,
                       event.scheduledTimeOut,
-                      event.date
+                      event.date,
+                      event.isOvernight,
+                      event.isLeave,
+                      event.leaveType
                     );
                     const nameDisplay = event.title ? event.title : "Unknown";
                     
                     return (
                       <tr key={event.id}>
-                        <td><strong>{nameDisplay}</strong></td>
-                        <td>{event.scheduledTimeIn || '?'} - {event.scheduledTimeOut || '?'}</td>
+                        <td>
+                          <strong>{nameDisplay}</strong>
+                          {event.isOvernight && event.date !== selectedDate && (
+                            <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>
+                              (Overnight)
+                            </span>
+                          )}
+                        </td>
+                        <td>{getDisplayDate(event)}</td>
+                        <td>{event.isLeave ? <span style={{color: '#94a3b8', fontStyle: 'italic'}}>Excused</span> : `${event.scheduledTimeIn || '?'} - ${event.scheduledTimeOut || '?'}`}</td>
                         <td>{event.timeIn || '-'}</td>
                         <td>{event.timeOut || '-'}</td>
                         <td>
@@ -158,7 +194,7 @@ function SummaryPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="5" className="empty-state">No scheduled duties for this date.</td>
+                    <td colSpan="6" className="empty-state">No scheduled duties for this date.</td>
                   </tr>
                 )}
               </tbody>
