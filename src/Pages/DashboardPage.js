@@ -2,8 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import TimeLogModal from "../Components/TimeLogModal";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import Loader from '../Components/Loader';
@@ -52,9 +51,9 @@ function DashboardPage() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "dutyEvents"), (snapshot) => {
-      const data = snapshot.docs.map(docSnapshot => ({ 
-        id: docSnapshot.id, 
-        ...docSnapshot.data() 
+      const data = snapshot.docs.map(docSnapshot => ({
+        id: docSnapshot.id,
+        ...docSnapshot.data()
       }));
       setEvents(data);
       setIsLoading(false);
@@ -118,50 +117,15 @@ function DashboardPage() {
     setTimeLogOpen(true);
   };
 
-  const exportCSV = () => {
-    const header = ["Date", "Name", "Shift", "Time In", "Time Out"];
-    const rows = events.map((event) => {
-      const [name, shift] = (event.title || "").split(" - ");
-      return [event.date, name || "", shift || "", event.timeIn || "", event.timeOut || ""];
-    });
-    const csv = [header, ...rows].map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "duty-schedule.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Duty Schedule", 14, 15);
-    
-    const header = [["Date", "Name", "Shift", "Time In", "Time Out"]];
-    const data = events.map((event) => {
-      const [name, shift] = (event.title || "").split(" - ");
-      return [event.date, name || "", shift || "", event.timeIn || "", event.timeOut || ""];
-    });
-
-    autoTable(doc, {
-      head: header,
-      body: data,
-      startY: 20,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [37, 99, 235] },
-    });
-
-    doc.save("duty-schedule.pdf");
-  };
 
   return (
     <PageContainer>
       {isLoading && <Loader message="Loading dashboard..." />}
       {userRole === 'admin' && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
-          <button 
-            onClick={() => setAlertsOpen(true)} 
+          <button
+            onClick={() => setAlertsOpen(true)}
             style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', transition: 'transform 0.2s', display: 'flex', alignItems: 'center' }}
             onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
             onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -182,11 +146,7 @@ function DashboardPage() {
           <span><strong>Note:</strong> If there are any changes needed for your schedule or logged times, please go to the Administrator.</span>
         </div>
       )}
-      <ActionRow>
-        <Button onClick={() => navigate("/calendar")}>View Monthly Schedule</Button>
-        <Button onClick={exportCSV}>Export Schedule (CSV)</Button>
-        <Button onClick={exportPDF}>Export Schedule (PDF)</Button>
-      </ActionRow>
+
 
       <FilterRow>
         <FilterInput value={search} placeholder="Search by person/shift" onChange={(e) => setSearch(e.target.value)} />
@@ -230,7 +190,7 @@ function DashboardPage() {
                       <>
                         <div>{shift}</div>
                         <div>{event.date}</div>
-                        {event.scheduledTimeIn && <div style={{fontSize: '14px', color:'#666'}}>Scheduled: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
+                        {event.scheduledTimeIn && <div style={{ fontSize: '14px', color: '#666' }}>Scheduled: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
                         {event.timeIn && <div>In: {event.timeIn}</div>}
                         {event.timeOut && <div>Out: {event.timeOut}</div>}
                       </>
@@ -244,7 +204,7 @@ function DashboardPage() {
       )}
 
       <SectionTitle>Today on Duty ({today})</SectionTitle>
-      <CardGrid>{todaysDuties.length===0 ? <Card>No duty assigned today</Card> : todaysDuties.map((event) => {
+      <CardGrid>{todaysDuties.length === 0 ? <Card>No duty assigned today</Card> : todaysDuties.map((event) => {
         const [name, shift] = (event.title || "").split(" - ");
         const isLeave = event.isLeave;
         return (
@@ -267,7 +227,7 @@ function DashboardPage() {
             ) : (
               <>
                 <div>{shift}</div>
-                {event.scheduledTimeIn && <div style={{fontSize: '14px', color:'#666'}}>Scheduled: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
+                {event.scheduledTimeIn && <div style={{ fontSize: '14px', color: '#666' }}>Scheduled: {event.scheduledTimeIn} - {event.scheduledTimeOut}</div>}
                 {event.timeIn && <div>In: {event.timeIn}</div>}
                 {event.timeOut && <div>Out: {event.timeOut}</div>}
               </>
@@ -280,12 +240,12 @@ function DashboardPage() {
       <UpcomingList>{next7Days.map(({ date, duties }) => (
         <UpcomingItem key={date}>
           <strong>{date}</strong> - {duties.length} duties
-          {duties.map((d) => <div key={`${d.id}-upcoming`} style={{fontSize:'0.85em', padding: '4px 0'}}>{d.isLeave ? `${d.title.split(" - ")[0]} - Excused (${d.leaveType})` : `${d.title} ${d.scheduledTimeIn ? `| Sched: ${d.scheduledTimeIn}-${d.scheduledTimeOut}` : ''} ${d.timeIn ? `| In:${d.timeIn}` : ''} ${d.timeOut ? `| Out:${d.timeOut}` : ''}`}</div>)}
+          {duties.map((d) => <div key={`${d.id}-upcoming`} style={{ fontSize: '0.85em', padding: '4px 0' }}>{d.isLeave ? `${d.title.split(" - ")[0]} - Excused (${d.leaveType})` : `${d.title} ${d.scheduledTimeIn ? `| Sched: ${d.scheduledTimeIn}-${d.scheduledTimeOut}` : ''} ${d.timeIn ? `| In:${d.timeIn}` : ''} ${d.timeOut ? `| Out:${d.timeOut}` : ''}`}</div>)}
         </UpcomingItem>
       ))}</UpcomingList>
 
 
-      
+
       <TimeLogModal
         isOpen={timeLogOpen}
         onClose={() => setTimeLogOpen(false)}
@@ -320,22 +280,22 @@ function DashboardPage() {
           <AlertModalContainer onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '2px solid #e2e8f0', paddingBottom: '12px' }}>
               <h2 style={{ margin: 0, color: '#1e293b', fontSize: '24px' }}>System Alerts</h2>
-              <button 
-                onClick={() => setAlertsOpen(false)} 
+              <button
+                onClick={() => setAlertsOpen(false)}
                 style={{ background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', color: '#64748b' }}
               >
                 &times;
               </button>
             </div>
-            
+
             {pendingLeaves.length > 0 && (
               <AlertCard style={{ background: '#fffbeb', color: '#d97706', borderColor: '#fde68a', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                   <div>Pending Leave Requests: {pendingLeaves.length}</div>
                   <div style={{ marginTop: '12px', fontSize: '16px', fontWeight: 'normal' }}>
                     {pendingLeaves.map(e => (
-                      <div 
-                        key={e.id} 
+                      <div
+                        key={e.id}
                         style={{ marginBottom: '6px', color: '#b45309', cursor: 'pointer' }}
                         onClick={() => {
                           setAlertsOpen(false);
@@ -354,7 +314,7 @@ function DashboardPage() {
             <AlertCard>{unassigned.length ? `Unassigned shifts: ${unassigned.length}` : "No unassigned shifts"}</AlertCard>
             <AlertCard>{overlapping.length ? `Overlapping shifts: ${overlapping.length}` : "No overlapping shifts"}</AlertCard>
             <AlertCard>{upcomingHour.length ? `Upcoming within 1 hour: ${upcomingHour.length}` : "No upcoming duties in 1 hour"}</AlertCard>
-            
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
               <Button onClick={() => setAlertsOpen(false)}>Close</Button>
             </div>
@@ -379,13 +339,6 @@ const PageContainer = styled.div`
   @media (max-width: 768px) {
     padding: 20px 16px;
   }
-`;
-
-const ActionRow = styled.div`
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 32px;
 `;
 
 const Button = styled.button`

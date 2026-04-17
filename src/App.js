@@ -37,7 +37,7 @@ function App() {
           <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
           <Route path="/templates" element={<ProtectedRoute requiredRole="admin"><TemplatesPage /></ProtectedRoute>} />
-          <Route path="/summary" element={<ProtectedRoute requiredRole="admin"><SummaryPage /></ProtectedRoute>} />
+          <Route path="/summary" element={<ProtectedRoute><SummaryPage /></ProtectedRoute>} />
         </Routes>
       </MainContent>
     </AppContainer>

@@ -278,7 +278,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
               )
             )}
 
-            {userRole === 'user' && (
+            {userRole === 'user' && isOwnSchedule && (
               <>
                 {event.leaveRequestDenied && !event.isLeaveRequestPending && !isRequesting && (
                   <div style={{ background: '#fef2f2', padding: '12px', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c', marginBottom: '16px', fontWeight: 'bold' }}>
@@ -364,7 +364,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                 </div>
               )}
 
-              {event.isLeaveRequestPending && userRole === 'user' && (
+              {event.isLeaveRequestPending && userRole === 'user' && isOwnSchedule && (
                 <div style={{ padding: '16px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a', height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <Label style={{ color: '#d97706', fontSize: '18px', marginTop: 0 }}>⏳ Leave Request Pending</Label>
                   <p style={{ marginTop: '12px', fontSize: '16px' }}>You requested a <strong>{event.pendingLeaveType}</strong>.</p>

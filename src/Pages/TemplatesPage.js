@@ -259,7 +259,7 @@ export default TemplatesPage;
 
 // Styled Components
 const Container = styled.div`
-  padding: 30px 40px;
+  padding: 20px 24px;
   max-width: 1200px;
   margin: 0 auto;
 
@@ -283,8 +283,8 @@ const Description = styled.p`
 
 const TemplateForm = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 32px;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
   align-items: start;
 
   @media (max-width: 600px) {
@@ -294,8 +294,8 @@ const TemplateForm = styled.div`
 
 const DayCard = styled.div`
   background: #ffffff;
-  padding: 24px;
-  border-radius: 16px;
+  padding: 16px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
   border-top: 6px solid ${(p) => p.$dayColor || '#2563eb'};
@@ -307,9 +307,9 @@ const DayHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   border-bottom: 2px solid #e2e8f0;
-  padding-bottom: 12px;
+  padding-bottom: 8px;
 `;
 
 const DayLabel = styled.h3`
@@ -321,16 +321,16 @@ const DayLabel = styled.h3`
 const AssignmentsArea = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
 `;
 
 const RowContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   background: #f8fafc;
-  padding: 16px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 8px;
   border: 1px solid #e2e8f0;
   position: relative;
   transition: all 0.2s;
@@ -343,7 +343,7 @@ const RowContainer = styled.div`
 
 const InputGroup = styled.div`
   display: flex;
-  gap: 12px;
+  gap: 8px;
 
   @media (max-width: 480px) {
     flex-direction: column;
@@ -353,10 +353,10 @@ const InputGroup = styled.div`
 
 const Input = styled.input`
   flex: 1;
-  padding: clamp(8px, 1.5vw, 12px) clamp(10px, 2vw, 16px);
+  padding: 8px 10px;
   border: 2px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: clamp(14px, 2vw, 16px);
+  border-radius: 6px;
+  font-size: 14px;
   outline: none;
 
   &:focus {
@@ -366,10 +366,10 @@ const Input = styled.input`
 
 const Select = styled.select`
   flex: 1;
-  padding: clamp(8px, 1.5vw, 12px) clamp(10px, 2vw, 16px);
+  padding: 8px 10px;
   border: 2px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: clamp(14px, 2vw, 16px);
+  border-radius: 6px;
+  font-size: 14px;
   outline: none;
 
   &:focus {

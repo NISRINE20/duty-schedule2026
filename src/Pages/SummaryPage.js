@@ -18,6 +18,9 @@ function SummaryPage() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   });
 
+  const authRole = localStorage.getItem('authRole');
+  const authName = localStorage.getItem('authName');
+
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "dutyEvents"), (snapshot) => {
       const data = snapshot.docs.map(docSnapshot => ({ 
@@ -35,6 +38,10 @@ function SummaryPage() {
   };
 
   const dayEvents = events.filter(event => {
+    if (authRole === 'user' && !event.title?.includes(authName)) {
+      return false;
+    }
+
     if (event.date === selectedDate) return true;
     if (event.isOvernight && event.date) {
       const d = new Date(event.date);
@@ -64,43 +71,118 @@ function SummaryPage() {
     return event.date;
   };
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    doc.text(`Duty Summary for ${selectedDate}`, 14, 15);
-    
-    const header = [["Name / Shift", "Date", "Scheduled", "Actual In", "Actual Out", "Status"]];
-    const data = dayEvents.map((event) => {
-      const status = getEventStatus(
-        event.timeIn,
-        event.timeOut,
-        event.scheduledTimeIn,
-        event.scheduledTimeOut,
-        event.date,
-        event.isOvernight,
-        event.isLeave,
-        event.leaveType
-      );
-      const nameDisplay = event.title ? event.title : "Unknown";
+  const loadImg = (src) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+    });
+  };
+
+  const exportPDF = async () => {
+    setIsLoading(true);
+    try {
+      const leftLogo = await loadImg('/left-logo.png');
+      const rightLogo = await loadImg('/right-logo.png');
+
+      const doc = new jsPDF('landscape');
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      const centerX = pageWidth / 2;
+
+      const drawHeaderAndFooter = () => {
+        if (leftLogo) {
+          const w = 26 * (leftLogo.width / leftLogo.height);
+          doc.addImage(leftLogo, 'PNG', 20, 15, w, 26);
+        }
+        if (rightLogo) {
+          const rightH = 32;
+          const w = rightH * (rightLogo.width / rightLogo.height);
+          doc.addImage(rightLogo, 'PNG', pageWidth - 20 - w, 15 - ((rightH - 26) / 2), w, rightH);
+        }
+
+        doc.setFont("times", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(100, 116, 139);
+
+        doc.text("HEADQUARTERS", centerX, 20, { align: "center" });
+        doc.text("EASTERN MINDANAO COMMAND", centerX, 26, { align: "center" });
+        
+        doc.setFont("times", "normal");
+        doc.setFontSize(11);
+        doc.text("ARMED FORCES OF THE PHILIPPINES", centerX, 32, { align: "center" });
+        
+        doc.setFont("times", "bold");
+        doc.text("Office of the Assistant Chief of Unified Command Staff for Personnel, U1", centerX, 38, { align: "center" });
+        
+        doc.setFont("times", "italic");
+        doc.text("Naval Station Felix Apolinario, Panacan, Davao City", centerX, 44, { align: "center" });
+
+        doc.setFont("times", "normal");
+        doc.setTextColor(0, 0, 0);
+        const today = new Date();
+        const dd = String(today.getDate()).padStart(2, '0');
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const yy = String(today.getFullYear()).slice(-2);
+        doc.text(`${dd}/${mm}/${yy}`, pageWidth - 20, 52, { align: "right" });
+
+        // Add Summary specific title slightly above the table
+        doc.setFont("times", "bold");
+        doc.setFontSize(11);
+        const titleText = authRole === 'admin' 
+          ? `Daily Duty Summary: ${selectedDate}` 
+          : `Personal Daily Duty Summary: ${selectedDate} - ${authName}`;
+        doc.text(titleText, 14, 60);
+      };
+
+      drawHeaderAndFooter();
       
-      return [
-        nameDisplay,
-        getDisplayDate(event),
-        event.isLeave ? 'Excused' : `${event.scheduledTimeIn || '?'} - ${event.scheduledTimeOut || '?'}`,
-        event.timeIn || '-',
-        event.timeOut || '-',
-        status || 'Unknown'
-      ];
-    });
+      const header = [["Name / Shift", "Date", "Scheduled", "Actual In", "Actual Out", "Status"]];
+      const data = dayEvents.map((event) => {
+        const status = getEventStatus(
+          event.timeIn,
+          event.timeOut,
+          event.scheduledTimeIn,
+          event.scheduledTimeOut,
+          event.date,
+          event.isOvernight,
+          event.isLeave,
+          event.leaveType
+        );
+        const nameDisplay = event.title ? event.title : "Unknown";
+        
+        return [
+          nameDisplay,
+          getDisplayDate(event),
+          event.isLeave ? 'Excused' : `${event.scheduledTimeIn || '?'} - ${event.scheduledTimeOut || '?'}`,
+          event.timeIn || '-',
+          event.timeOut || '-',
+          status || 'Unknown'
+        ];
+      });
 
-    autoTable(doc, {
-      head: header,
-      body: data,
-      startY: 20,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [37, 99, 235] },
-    });
+      autoTable(doc, {
+        head: header,
+        body: data,
+        startY: 65,
+        styles: { fontSize: 10, font: 'times' },
+        headStyles: { fillColor: [37, 99, 235], font: 'times', fontStyle: 'bold' },
+        didDrawPage: function (data) {
+          doc.setFont("times", "italic");
+          doc.setFontSize(11);
+          doc.setTextColor(115, 115, 115);
+          doc.text('AFP Core Values: "Honor, Service, Patriotism"', centerX, pageHeight - 15, { align: "center" });
+        }
+      });
 
-    doc.save(`duty-summary-${selectedDate}.pdf`);
+      doc.save(`duty-summary-${selectedDate}.pdf`);
+    } catch(err) {
+      console.error(err);
+      alert("Error generating PDF: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

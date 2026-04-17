@@ -111,12 +111,12 @@ function Navbar() {
               <IconWrapper><TemplatesIcon /></IconWrapper>
               <LinkLabel $isOpen={isOpen}>Templates</LinkLabel>
             </StyledLink>
-            <StyledLink to="/summary" $active={location.pathname === "/summary"}>
-              <IconWrapper><SummaryIcon /></IconWrapper>
-              <LinkLabel $isOpen={isOpen}>Summary</LinkLabel>
-            </StyledLink>
           </>
         )}
+        <StyledLink to="/summary" $active={location.pathname === "/summary"}>
+          <IconWrapper><SummaryIcon /></IconWrapper>
+          <LinkLabel $isOpen={isOpen}>Summary</LinkLabel>
+        </StyledLink>
       </LinksContainer>
 
       <BottomSection>
