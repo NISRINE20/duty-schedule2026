@@ -26,10 +26,6 @@ function TemplatesPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState({ open: false, title: '', message: '', isError: false });
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-  });
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -59,64 +55,6 @@ function TemplatesPage() {
     }
   };
 
-  const applyTemplate = async () => {
-    if (!selectedMonth) {
-      setShowConfirmModal({ open: true, title: 'Error', message: 'Please select a month.', isError: true });
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const [year, month] = selectedMonth.split('-').map(Number);
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const eventsToCreate = [];
-
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' });
-        const dayTemplates = templates[dayOfWeek] || [];
-
-        dayTemplates.forEach((shift) => {
-          if (shift.name && shift.shift && shift.timeIn && shift.timeOut) {
-            eventsToCreate.push({
-              title: `${shift.name} - ${shift.shift}`,
-              date: date,
-              timeIn: "",
-              timeOut: "",
-              scheduledTimeIn: shift.timeIn,
-              scheduledTimeOut: shift.timeOut,
-              isConfirmed: false,
-              isOvernight: false,
-              isLeave: false,
-              leaveType: "",
-              leaveEndDate: "",
-              leaveDays: 0,
-              excludeWeekends: false,
-              isLeaveRequestPending: false,
-              pendingLeaveType: "",
-              leaveRequestDenied: false
-            });
-          }
-        });
-      }
-
-      if (eventsToCreate.length === 0) {
-        setShowConfirmModal({ open: true, title: 'No Events', message: 'No valid shifts found in the template for the selected month.', isError: true });
-        setIsLoading(false);
-        return;
-      }
-
-      const promises = eventsToCreate.map(event => addDoc(collection(db, 'dutyEvents'), event));
-      await Promise.all(promises);
-
-      setShowConfirmModal({ open: true, title: 'Success', message: `Applied template to ${eventsToCreate.length} duty events for ${selectedMonth}!`, isError: false });
-    } catch (e) {
-      console.error("Error applying template:", e);
-      setShowConfirmModal({ open: true, title: 'Error', message: `Error applying template: ${e.message}`, isError: true });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleChange = (day, index, field, value) => {
     setTemplates(prev => {
       const updatedDay = [...prev[day]];
@@ -134,7 +72,7 @@ function TemplatesPage() {
 
   const removeAssignment = async (day, index) => {
     const target = templates[day][index];
-    
+
     setIsLoading(true);
     // Auto-sync deletion to the Calendar for the current month
     if (target && target.name) {
@@ -158,21 +96,21 @@ function TemplatesPage() {
       const deletePromises = [];
 
       eventsSnapshot.docs.forEach(docSnap => {
-         const e = { id: docSnap.id, ...docSnap.data() };
-         if (!e.date) return;
-         
-         const eDate = new Date(e.date);
-         if (eDate.getFullYear() === year && eDate.getMonth() === month) {
-            const eDayName = eDate.toLocaleDateString('en-US', { weekday: 'long' });
-            if (eDayName === dayName) {
-               const eTitle = e.title.replace('✅ ', '').trim().toLowerCase();
-               const targetTitle = `${personName} - ${shiftTitle}`.toLowerCase();
-               
-               if (eTitle === targetTitle) {
-                  deletePromises.push(deleteDoc(doc(db, 'dutyEvents', e.id)));
-               }
+        const e = { id: docSnap.id, ...docSnap.data() };
+        if (!e.date) return;
+
+        const eDate = new Date(e.date);
+        if (eDate.getFullYear() === year && eDate.getMonth() === month) {
+          const eDayName = eDate.toLocaleDateString('en-US', { weekday: 'long' });
+          if (eDayName === dayName) {
+            const eTitle = e.title.replace('✅ ', '').trim().toLowerCase();
+            const targetTitle = `${personName} - ${shiftTitle}`.toLowerCase();
+
+            if (eTitle === targetTitle) {
+              deletePromises.push(deleteDoc(doc(db, 'dutyEvents', e.id)));
             }
-         }
+          }
+        }
       });
       await Promise.all(deletePromises);
     } catch (e) {
@@ -189,27 +127,27 @@ function TemplatesPage() {
     setIsLoading(true);
     try {
       const eventsSnapshot = await getDocs(collection(db, 'dutyEvents'));
-      const currentEvents = eventsSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
-      
+      const currentEvents = eventsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
       const todayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       let addedCount = 0;
 
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        
+
         // Skip previous dates in the month
         if (dateStr < todayStr) continue;
 
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
         const dayTemplates = templates[dayName] || [];
-        
+
         for (const template of dayTemplates) {
           if (template.name && template.shift) {
             const targetTitle = `${template.name} - ${template.shift}`;
-            
+
             // Anti-duplication check: Ensure shift doesn't already exist for this user on this day
-            const alreadyExists = currentEvents.some(e => 
+            const alreadyExists = currentEvents.some(e =>
               e.date === dateStr && e.title.replace('✅ ', '').trim().toLowerCase() === targetTitle.toLowerCase()
             );
 
@@ -278,18 +216,18 @@ function TemplatesPage() {
                     </Select>
                   </InputGroup>
                   <InputGroup>
-                    <label style={{flex: 1, fontSize: '13px', color: '#64748b', fontWeight: '500'}}>Time In
+                    <label style={{ flex: 1, fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Time In
                       <Input
                         type="time"
-                        style={{marginTop: '4px', width: '100%', boxSizing: 'border-box'}}
+                        style={{ marginTop: '4px', width: '100%', boxSizing: 'border-box' }}
                         value={assignment.timeIn}
                         onChange={(e) => handleChange(day, index, 'timeIn', e.target.value)}
                       />
                     </label>
-                    <label style={{flex: 1, fontSize: '13px', color: '#64748b', fontWeight: '500'}}>Time Out
+                    <label style={{ flex: 1, fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Time Out
                       <Input
                         type="time"
-                        style={{marginTop: '4px', width: '100%', boxSizing: 'border-box'}}
+                        style={{ marginTop: '4px', width: '100%', boxSizing: 'border-box' }}
                         value={assignment.timeOut}
                         onChange={(e) => handleChange(day, index, 'timeOut', e.target.value)}
                       />
@@ -298,7 +236,7 @@ function TemplatesPage() {
                   <RemoveButton onClick={() => removeAssignment(day, index)} title="Remove assignment">✕</RemoveButton>
                 </RowContainer>
               ))}
-              {(!templates[day] || templates[day].length === 0) && <span style={{color: '#94a3b8', fontStyle: 'italic', display: 'block', textAlign: 'center', padding: '16px 0'}}>No assignments yet.</span>}
+              {(!templates[day] || templates[day].length === 0) && <span style={{ color: '#94a3b8', fontStyle: 'italic', display: 'block', textAlign: 'center', padding: '16px 0' }}>No assignments yet.</span>}
             </AssignmentsArea>
           </DayCard>
         ))}
