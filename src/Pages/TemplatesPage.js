@@ -26,6 +26,10 @@ function TemplatesPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState({ open: false, title: '', message: '', isError: false });
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -50,6 +54,64 @@ function TemplatesPage() {
       setShowConfirmModal({ open: true, title: 'Success', message: 'Templates configuration saved successfully!', isError: false });
     } catch (e) {
       setShowConfirmModal({ open: true, title: 'Error', message: `Error saving templates: ${e.message}`, isError: true });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const applyTemplate = async () => {
+    if (!selectedMonth) {
+      setShowConfirmModal({ open: true, title: 'Error', message: 'Please select a month.', isError: true });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const eventsToCreate = [];
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' });
+        const dayTemplates = templates[dayOfWeek] || [];
+
+        dayTemplates.forEach((shift) => {
+          if (shift.name && shift.shift && shift.timeIn && shift.timeOut) {
+            eventsToCreate.push({
+              title: `${shift.name} - ${shift.shift}`,
+              date: date,
+              timeIn: "",
+              timeOut: "",
+              scheduledTimeIn: shift.timeIn,
+              scheduledTimeOut: shift.timeOut,
+              isConfirmed: false,
+              isOvernight: false,
+              isLeave: false,
+              leaveType: "",
+              leaveEndDate: "",
+              leaveDays: 0,
+              excludeWeekends: false,
+              isLeaveRequestPending: false,
+              pendingLeaveType: "",
+              leaveRequestDenied: false
+            });
+          }
+        });
+      }
+
+      if (eventsToCreate.length === 0) {
+        setShowConfirmModal({ open: true, title: 'No Events', message: 'No valid shifts found in the template for the selected month.', isError: true });
+        setIsLoading(false);
+        return;
+      }
+
+      const promises = eventsToCreate.map(event => addDoc(collection(db, 'dutyEvents'), event));
+      await Promise.all(promises);
+
+      setShowConfirmModal({ open: true, title: 'Success', message: `Applied template to ${eventsToCreate.length} duty events for ${selectedMonth}!`, isError: false });
+    } catch (e) {
+      console.error("Error applying template:", e);
+      setShowConfirmModal({ open: true, title: 'Error', message: `Error applying template: ${e.message}`, isError: true });
     } finally {
       setIsLoading(false);
     }
@@ -155,11 +217,20 @@ function TemplatesPage() {
               await addDoc(collection(db, 'dutyEvents'), {
                 title: targetTitle,
                 date: dateStr,
-                timeIn: template.timeIn || '',
-                timeOut: template.timeOut || '',
+                timeIn: "",
+                timeOut: "",
                 scheduledTimeIn: template.timeIn || '',
                 scheduledTimeOut: template.timeOut || '',
-                isConfirmed: false
+                isConfirmed: false,
+                isOvernight: false,
+                isLeave: false,
+                leaveType: "",
+                leaveEndDate: "",
+                leaveDays: 0,
+                excludeWeekends: false,
+                isLeaveRequestPending: false,
+                pendingLeaveType: "",
+                leaveRequestDenied: false
               });
               addedCount++;
             }

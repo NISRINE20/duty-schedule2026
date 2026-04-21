@@ -17,6 +17,10 @@ function SummaryPage() {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   });
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   const authRole = localStorage.getItem('authRole');
   const authName = localStorage.getItem('authName');
@@ -62,6 +66,9 @@ function SummaryPage() {
 
   const getDisplayDate = (event) => {
     if (!event.date) return 'Unknown';
+    if (event.leaveEndDate && event.leaveEndDate !== event.date) {
+      return `${event.date} to ${event.leaveEndDate}`;
+    }
     if (event.isOvernight) {
       const d = new Date(event.date);
       d.setDate(d.getDate() + 1);
@@ -70,6 +77,33 @@ function SummaryPage() {
     }
     return event.date;
   };
+
+  const getShiftFromTitle = (title, isLeave) => {
+    if (isLeave) return 'Leave';
+    if (!title || !title.includes(' - ')) return 'Unknown';
+    return title.split(' - ')[1] || 'Unknown';
+  };
+
+  const monthlyEvents = events.filter((event) => {
+    if (!event.date) return false;
+    if (!event.date.startsWith(selectedMonth)) return false;
+    if (authRole === 'user' && !event.title?.includes(authName)) {
+      return false;
+    }
+    return true;
+  });
+
+  const monthlyRotationData = Object.values(monthlyEvents.reduce((acc, event) => {
+    const name = event.title ? event.title.split(' - ')[0] : 'Unknown';
+    const shift = getShiftFromTitle(event.title, event.isLeave);
+    if (!acc[name]) {
+      acc[name] = { name, Morning: 0, Afternoon: 0, Night: 0, Leave: 0, Other: 0, Total: 0 };
+    }
+    const key = ['Morning', 'Afternoon', 'Night', 'Leave'].includes(shift) ? shift : 'Other';
+    acc[name][key] += 1;
+    acc[name].Total += 1;
+    return acc;
+  }, {})).sort((a, b) => a.name.localeCompare(b.name));
 
   const loadImg = (src) => {
     return new Promise((resolve) => {
@@ -138,7 +172,7 @@ function SummaryPage() {
 
       drawHeaderAndFooter();
       
-      const header = [["Name / Shift", "Date", "Scheduled", "Actual In", "Actual Out", "Status"]];
+      const header = [["Name / Shift", "Date", "Scheduled", "Leave Days", "Actual In", "Actual Out", "Status"]];
       const data = dayEvents.map((event) => {
         const status = getEventStatus(
           event.timeIn,
@@ -156,6 +190,7 @@ function SummaryPage() {
           nameDisplay,
           getDisplayDate(event),
           event.isLeave ? 'Excused' : `${event.scheduledTimeIn || '?'} - ${event.scheduledTimeOut || '?'}`,
+          event.isLeave ? (event.leaveDays || 1) : '-',
           event.timeIn || '-',
           event.timeOut || '-',
           status || 'Unknown'
@@ -224,7 +259,51 @@ function SummaryPage() {
               Export to PDF
             </ExportButton>
           </DataHeader>
-          
+
+          <MonthlySection>
+            <ReportHeader>
+              <div>
+                <h3>Monthly Rotation Report</h3>
+                <p>Review the shift rotation counts for the selected month.</p>
+              </div>
+              <MonthInput
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+              />
+            </ReportHeader>
+            <RotationTable>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Morning</th>
+                  <th>Afternoon</th>
+                  <th>Night</th>
+                  <th>Leave</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyRotationData.length > 0 ? (
+                  monthlyRotationData.map((row) => (
+                    <tr key={row.name}>
+                      <td>{row.name}</td>
+                      <td>{row.Morning}</td>
+                      <td>{row.Afternoon}</td>
+                      <td>{row.Night}</td>
+                      <td>{row.Leave}</td>
+                      <td>{row.Total}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="empty-state">No shift rotation records for this month.</td>
+                  </tr>
+                )}
+              </tbody>
+            </RotationTable>
+          </MonthlySection>
+
           <TableContainer>
             <Table>
               <thead>
@@ -232,6 +311,7 @@ function SummaryPage() {
                   <th>Name / Shift</th>
                   <th>Date</th>
                   <th>Scheduled</th>
+                  <th>Leave Days</th>
                   <th>Actual In</th>
                   <th>Actual Out</th>
                   <th>Status</th>
@@ -264,9 +344,10 @@ function SummaryPage() {
                         </td>
                         <td>{getDisplayDate(event)}</td>
                         <td>{event.isLeave ? <span style={{color: '#94a3b8', fontStyle: 'italic'}}>Excused</span> : `${event.scheduledTimeIn || '?'} - ${event.scheduledTimeOut || '?'}`}</td>
-                        <td>{event.timeIn || '-'}</td>
-                        <td>{event.timeOut || '-'}</td>
-                        <td>
+                      <td>{event.isLeave ? (event.leaveDays || 1) : '-'}</td>
+                      <td>{event.timeIn || '-'}</td>
+                      <td>{event.timeOut || '-'}</td>
+                      <td>
                           <StatusBadge color={getStatusColor(status)}>
                             {status || 'Unknown'}
                           </StatusBadge>
@@ -276,7 +357,7 @@ function SummaryPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="6" className="empty-state">No scheduled duties for this date.</td>
+                    <td colSpan="7" className="empty-state">No scheduled duties for this date.</td>
                   </tr>
                 )}
               </tbody>
@@ -404,17 +485,51 @@ const DataHeader = styled.div`
   }
 `;
 
-const TableContainer = styled.div`
-  overflow-x: auto;
+const MonthlySection = styled.div`
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 24px;
 `;
 
-const Table = styled.table`
+const ReportHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #1e293b;
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: #475569;
+    font-size: 14px;
+  }
+`;
+
+const MonthInput = styled.input`
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: white;
+  color: #0f172a;
+  font-size: 14px;
+  width: 190px;
+`;
+
+const RotationTable = styled.table`
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  
+
   th, td {
-    padding: 14px 16px;
+    padding: 10px 12px;
     border-bottom: 1px solid #e2e8f0;
     text-align: left;
     white-space: nowrap;
@@ -425,15 +540,57 @@ const Table = styled.table`
     font-size: 13px;
     font-weight: 600;
     text-transform: uppercase;
+    background: #eff6ff;
+    letter-spacing: 0.5px;
+  }
+
+  td {
+    color: #334155;
+    font-size: 14px;
+  }
+
+  tbody tr:hover td {
+    background-color: #f8fafc;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 24px;
+    color: #94a3b8;
+    font-size: 15px;
+  }
+`;
+
+const TableContainer = styled.div`
+  overflow-x: auto;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+
+  th, td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  th {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
     background: #f8fafc;
     letter-spacing: 0.5px;
   }
-  
+
   th:first-child {
     border-top-left-radius: 8px;
     border-bottom-left-radius: 8px;
   }
-  
+
   th:last-child {
     border-top-right-radius: 8px;
     border-bottom-right-radius: 8px;
@@ -441,7 +598,7 @@ const Table = styled.table`
 
   td {
     color: #334155;
-    font-size: 15px;
+    font-size: 14px;
   }
 
   strong {
@@ -459,9 +616,9 @@ const Table = styled.table`
 
   .empty-state {
     text-align: center;
-    padding: 40px;
+    padding: 16px;
     color: #94a3b8;
-    font-size: 15px;
+    font-size: 14px;
   }
 `;
 

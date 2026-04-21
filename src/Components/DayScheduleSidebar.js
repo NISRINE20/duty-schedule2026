@@ -1,9 +1,19 @@
 import React from "react";
 import styled from "styled-components";
 
-function DayScheduleSidebar({ selectedDate, events, onClose, onAddNew }) {
+function DayScheduleSidebar({ selectedDate, events, onClose, onAddNew, onMarkLeave }) {
   const dayEvents = events.filter(event => {
     if (event.date === selectedDate) return true;
+
+    if (event.leaveEndDate && event.date) {
+      const start = new Date(event.date);
+      const end = new Date(event.leaveEndDate);
+      const target = new Date(selectedDate);
+      start.setHours(0,0,0,0);
+      end.setHours(0,0,0,0);
+      target.setHours(0,0,0,0);
+      if (target >= start && target <= end) return true;
+    }
     
     if (event.isOvernight && event.date) {
       const d = new Date(event.date);
@@ -54,6 +64,7 @@ function DayScheduleSidebar({ selectedDate, events, onClose, onAddNew }) {
           </EventList>
         )}
         {!isPast && userRole === 'admin' && <AddButton onClick={onAddNew}>Add New Schedule</AddButton>}
+        {!isPast && userRole !== 'admin' && <AddButton onClick={onMarkLeave} style={{ backgroundColor: '#f59e0b' }}>Mark as Leave</AddButton>}
       </Content>
     </Sidebar>
   );

@@ -21,6 +21,7 @@ function CalendarPage() {
   const [timeLogOpen, setTimeLogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [modalType, setModalType] = useState('schedule');
 
   const USER_COLORS = [
     "#bae6fd", "#bbf7d0", "#fef08a", "#fbcfe8", "#fed7aa", "#e9d5ff", "#ccfbf1", "#fecaca", "#e5e7eb"
@@ -59,15 +60,28 @@ function CalendarPage() {
     }
   }, [events, location.state]);
 
+  const userRole = localStorage.getItem('authRole');
+  const authName = localStorage.getItem('authName') || '';
+
+  const visibleEvents = events.filter((e) => {
+    if (userRole === 'admin') return true;
+    const owner = e.title ? e.title.split(' - ')[0] : '';
+    if (e.isLeaveRequestPending || e.leaveRequestDenied) {
+      return owner.toLowerCase() === authName.toLowerCase();
+    }
+    return true;
+  });
+
   console.log('Rendering CalendarPage, modalOpen:', modalOpen, 'selectedDate:', selectedDate);
 
   const handleDateClick = (info) => {
     setSelectedDate(info.dateStr);
   };
 
-  const formattedEvents = events.map((e) => {
+  const formattedEvents = visibleEvents.map((e) => {
     const name = e.title ? e.title.split(" - ")[0] : "";
-    const bgColor = e.isLeave ? "#94a3b8" : getColorForName(name);
+    let bgColor = e.isLeave ? "#94a3b8" : getColorForName(name);
+    if (e.isLeaveRequestPending) bgColor = "#fef08a";
 
     let titleStatus = e.title;
     if (e.isLeave) {
@@ -77,7 +91,7 @@ function CalendarPage() {
     } else if (e.leaveRequestDenied) {
       titleStatus = `❌ ${e.title}`;
     } else if (e.isLeaveRequestPending) {
-      titleStatus = `⏳ ${e.title}`;
+      titleStatus = `⏳ PENDING: ${name} - ${e.pendingLeaveType} Request`;
     }
 
     let eventProps = {
@@ -86,10 +100,15 @@ function CalendarPage() {
       title: titleStatus,
       backgroundColor: bgColor,
       borderColor: bgColor,
-      textColor: e.isLeave ? "#ffffff" : "#0f172a",
+      textColor: e.isLeave ? "#ffffff" : e.isLeaveRequestPending ? "#92400e" : "#0f172a",
     };
 
-    if (e.isOvernight && e.date) {
+    if (e.leaveEndDate) {
+      const d = new Date(e.leaveEndDate);
+      d.setDate(d.getDate() + 1);
+      eventProps.end = d.toISOString().split('T')[0];
+      eventProps.allDay = true;
+    } else if (e.isOvernight && e.date) {
       const d = new Date(e.date);
       // FullCalendar's all-day 'end' is exclusive, meaning we need to add 2 days to span exactly 2 boxes (today and tomorrow).
       d.setDate(d.getDate() + 2);
@@ -99,13 +118,16 @@ function CalendarPage() {
     return eventProps;
   });
 
-  const handleSave = async ({ name, shift, scheduledTimeIn, scheduledTimeOut, isRepeating, selectedDays, untilDate, isLeave, leaveType }) => {
+  const handleSave = async ({ name, shift, scheduledTimeIn, scheduledTimeOut, isRepeating, selectedDays, untilDate, isLeave, leaveType, leaveEndDate, leaveDays, excludeWeekends }) => {
     setIsLoading(true);
     try {
       const isOvernight = scheduledTimeOut && scheduledTimeIn ? scheduledTimeOut <= scheduledTimeIn : false;
       const datesToCreate = [];
 
-      if (isRepeating && untilDate && selectedDays.length > 0) {
+      if (modalType === 'leave' && leaveEndDate) {
+        // For leave, create a single multi-day event
+        datesToCreate.push(selectedDate);
+      } else if (isRepeating && untilDate && selectedDays.length > 0) {
         let current = new Date(selectedDate);
         const end = new Date(untilDate);
         
@@ -127,7 +149,7 @@ function CalendarPage() {
 
       const promises = datesToCreate.map(date => 
         addDoc(collection(db, 'dutyEvents'), {
-          title: `${name} - ${shift}`,
+          title: modalType === 'leave' ? `${name} - Leave Request` : `${name} - ${shift}`,
           date: date,
           timeIn: "",
           timeOut: "",
@@ -135,8 +157,14 @@ function CalendarPage() {
           scheduledTimeOut: scheduledTimeOut || "",
           isConfirmed: false,
           isOvernight: isOvernight,
-          isLeave: isLeave || false,
-          leaveType: leaveType || ""
+          isLeave: modalType === 'leave' ? false : (isLeave || false),
+          leaveType: leaveType || "",
+          leaveEndDate: modalType === 'leave' ? leaveEndDate || date : "",
+          leaveDays: modalType === 'leave' ? leaveDays || 1 : 0,
+          excludeWeekends: modalType === 'leave' ? excludeWeekends || false : false,
+          isLeaveRequestPending: modalType === 'leave' ? true : false,
+          pendingLeaveType: modalType === 'leave' ? leaveType : "",
+          leaveRequestDenied: false
         })
       );
 
@@ -194,6 +222,7 @@ function CalendarPage() {
         onClose={() => setModalOpen(false)}
         selectedDate={selectedDate}
         onSave={handleSave}
+        modalType={modalType}
       />
 
       <TimeLogModal
@@ -228,9 +257,10 @@ function CalendarPage() {
       {selectedDate && (
         <DayScheduleSidebar
           selectedDate={selectedDate}
-          events={events}
+          events={visibleEvents}
           onClose={() => setSelectedDate(null)}
-          onAddNew={() => setModalOpen(true)}
+          onAddNew={() => { setModalType('schedule'); setModalOpen(true); }}
+          onMarkLeave={() => { setModalType('leave'); setModalOpen(true); }}
         />
       )}
     </Container>

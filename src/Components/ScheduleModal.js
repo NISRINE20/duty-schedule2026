@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
+import { calculateLeaveEndDate } from "../utils/leaveCalculations";
 
-function ScheduleModal({ isOpen, onClose, selectedDate, onSave }) {
+function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
   const [isRepeating, setIsRepeating] = useState(false);
   const [untilDate, setUntilDate] = useState("");
   const [selectedDays, setSelectedDays] = useState([]);
+  const [leaveEndDate, setLeaveEndDate] = useState("");
+  const [leaveDays, setLeaveDays] = useState(1);
+  const [excludeWeekends, setExcludeWeekends] = useState(false);
   const [shiftType, setShiftType] = useState('Morning');
   const [leaveType, setLeaveType] = useState('Sick Leave');
   const [otherLeaveStr, setOtherLeaveStr] = useState('');
+  const [name, setName] = useState('');
+
+  const authName = localStorage.getItem('authName');
 
   const daysOfWeek = [
     { label: 'Sun', value: 0 },
@@ -23,9 +30,13 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave }) {
     if (isOpen) {
       setIsRepeating(false);
       setUntilDate("");
-      setShiftType('Morning');
+      setShiftType(modalType === 'leave' ? 'Leave' : 'Morning');
       setLeaveType('Sick Leave');
       setOtherLeaveStr('');
+      setLeaveDays(1);
+      setExcludeWeekends(false);
+      setLeaveEndDate(selectedDate || '');
+      setName(authName || '');
       if (selectedDate) {
         // We'll treat the string YYYY-MM-DD correctly, taking timezone into account
         const [year, month, day] = selectedDate.split('-');
@@ -35,27 +46,42 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave }) {
         setSelectedDays([]);
       }
     }
-  }, [isOpen, selectedDate]);
+  }, [isOpen, selectedDate, modalType, authName]);
+
+  // Recalculate leave end date when days or weekend exclusion changes
+  useEffect(() => {
+    if (modalType === 'leave' && selectedDate && leaveDays > 0) {
+      const calculatedEndDate = calculateLeaveEndDate(selectedDate, leaveDays, excludeWeekends);
+      setLeaveEndDate(calculatedEndDate);
+    }
+  }, [selectedDate, leaveDays, excludeWeekends, modalType]);
 
   if (!isOpen) return null;
 
   return (
     <Overlay>
       <ModalContainer $isRepeating={isRepeating}>
-        <h2>Add Duty Schedule</h2>
+        <h2>{modalType === 'leave' ? 'Request Leave' : 'Add Duty Schedule'}</h2>
+        <CloseButton onClick={onClose}>×</CloseButton>
         <p>Date: {selectedDate}</p>
 
         <Grid $isRepeating={isRepeating}>
           <Column>
             <Label>Name:</Label>
-            <Input type="text" id="name" />
+            <Input type="text" id="name" value={name} onChange={e => setName(e.target.value)} />
 
             <Label>Shift:</Label>
             <Select id="shift" value={shiftType} onChange={e => setShiftType(e.target.value)}>
-              <option value="Morning">Morning</option>
-              <option value="Afternoon">Afternoon</option>
-              <option value="Night">Night</option>
-              <option value="Leave">Leave</option>
+              {modalType === 'leave' ? (
+                <option value="Leave">Leave</option>
+              ) : (
+                <>
+                  <option value="Morning">Morning</option>
+                  <option value="Afternoon">Afternoon</option>
+                  <option value="Night">Night</option>
+                  <option value="Leave">Leave</option>
+                </>
+              )}
             </Select>
 
             {shiftType !== 'Leave' ? (
@@ -78,26 +104,58 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave }) {
                   <option value="Other">Other (Specify)</option>
                 </Select>
                 {leaveType === 'Other' && (
-                  <Input 
-                    type="text" 
-                    placeholder="Specify leave type..." 
+                  <Input
+                    type="text"
+                    placeholder="Specify leave type..."
                     style={{ marginTop: '12px' }}
                     value={otherLeaveStr}
                     onChange={e => setOtherLeaveStr(e.target.value)}
                   />
                 )}
+
+                <Label style={{ marginTop: '16px' }}>Number of Leave Days:</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={leaveDays}
+                  onChange={(e) => setLeaveDays(Math.max(1, parseInt(e.target.value) || 1))}
+                />
+
+                <CheckboxContainer style={{ marginTop: '12px' }}>
+                  <input
+                    type="checkbox"
+                    id="excludeWeekends"
+                    checked={excludeWeekends}
+                    onChange={(e) => setExcludeWeekends(e.target.checked)}
+                  />
+                  <label htmlFor="excludeWeekends">Exclude weekends (working days only)</label>
+                </CheckboxContainer>
+
+                <Label style={{ marginTop: '16px' }}>Leave End Date:</Label>
+                <Input
+                  type="date"
+                  value={leaveEndDate}
+                  onChange={(e) => setLeaveEndDate(e.target.value)}
+                  min={selectedDate}
+                />
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  {excludeWeekends ? 'Working days' : 'Calendar days'} • {leaveDays} day{leaveDays !== 1 ? 's' : ''} requested
+                </div>
               </>
             )}
 
-            <CheckboxContainer style={{ marginTop: '16px' }}>
-              <input 
-                type="checkbox" 
-                id="isRepeating" 
-                checked={isRepeating} 
-                onChange={(e) => setIsRepeating(e.target.checked)} 
-              />
-              <label htmlFor="isRepeating">Repeat Schedule?</label>
-            </CheckboxContainer>
+            {modalType !== 'leave' && (
+              <CheckboxContainer style={{ marginTop: '16px' }}>
+                <input
+                  type="checkbox"
+                  id="isRepeating"
+                  checked={isRepeating}
+                  onChange={(e) => setIsRepeating(e.target.checked)}
+                />
+                <label htmlFor="isRepeating">Repeat Schedule?</label>
+              </CheckboxContainer>
+            )}
           </Column>
 
           {isRepeating && (
@@ -164,12 +222,24 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave }) {
                 }
               }
               
-              if (isRepeating && !untilDate) {
+              if (modalType !== 'leave' && isRepeating && !untilDate) {
                 alert("Please select an Until Date for the repeating schedule.");
                 return;
               }
-              if (isRepeating && selectedDays.length === 0) {
+              if (modalType !== 'leave' && isRepeating && selectedDays.length === 0) {
                 alert("Please select at least one day to repeat.");
+                return;
+              }
+              if (shiftType === 'Leave' && !leaveEndDate) {
+                alert("Please select the leave end date.");
+                return;
+              }
+              if (shiftType === 'Leave' && leaveEndDate < selectedDate) {
+                alert("Leave end date cannot be before the start date.");
+                return;
+              }
+              if (shiftType === 'Leave' && leaveDays < 1) {
+                alert("Number of leave days must be at least 1.");
                 return;
               }
 
@@ -182,7 +252,10 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave }) {
                 selectedDays, 
                 untilDate,
                 isLeave,
-                leaveType: finalLeaveType
+                leaveType: finalLeaveType,
+                leaveEndDate,
+                leaveDays,
+                excludeWeekends
               });
               onClose();
             }}
@@ -231,6 +304,7 @@ const ModalContainer = styled.div`
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease-in-out;
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
 
   @keyframes slideUp {
     from { transform: translateY(20px); opacity: 0; }
@@ -388,5 +462,29 @@ const DayToggle = styled.div`
 
   &:hover {
     background: ${props => props.active ? '#1d4ed8' : '#cbd5e1'};
+  }
+`;
+
+const CloseButton = styled.button`
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #f1f5f9;
+    color: #334155;
   }
 `;
