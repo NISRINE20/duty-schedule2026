@@ -30,7 +30,7 @@ const getColorForName = (name) => {
 };
 
 const BellIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="#0f172a" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
   </svg>
@@ -90,20 +90,23 @@ function DashboardPage() {
   const unassigned = useMemo(() => events.filter((e) => !e.title || e.title.trim() === ""), [events]);
 
   const overlapping = useMemo(() => {
-    const byDate = {};
+    const byPersonAndDate = {};
     events.forEach((e) => {
-      if (!byDate[e.date]) byDate[e.date] = [];
-      byDate[e.date].push(e);
+      const name = e.title ? e.title.split(' - ')[0] : 'Unknown';
+      const key = `${name}_${e.date}`;
+      if (!byPersonAndDate[key]) byPersonAndDate[key] = [];
+      byPersonAndDate[key].push(e);
     });
-    return Object.entries(byDate)
+    return Object.entries(byPersonAndDate)
       .filter(([_, list]) => list.length > 1)
-      .flatMap(([date, list]) => list.map((e) => ({ ...e, date })));
+      .flatMap(([_, list]) => list);
   }, [events]);
 
   const upcomingHour = useMemo(() => {
     const now = new Date();
     return events.filter((e) => {
-      const dt = new Date(e.date + "T" + (e.timeIn || "00:00") + ":00");
+      if (!e.scheduledTimeIn) return false;
+      const dt = new Date(e.date + "T" + e.scheduledTimeIn + ":00");
       const diff = dt - now;
       return diff >= 0 && diff <= 3600000;
     });
@@ -122,11 +125,11 @@ function DashboardPage() {
   return (
     <PageContainer>
       {isLoading && <Loader message="Loading dashboard..." />}
-      {userRole === 'admin' && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px', gap: '16px', alignItems: 'center' }}>
+        {userRole === 'admin' && (
           <button
             onClick={() => setAlertsOpen(true)}
-            style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', transition: 'transform 0.2s', display: 'flex', alignItems: 'center' }}
+            style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', transition: 'transform 0.2s', display: 'flex', alignItems: 'center', color: 'inherit' }}
             onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
             onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
             title="System Alerts"
@@ -138,8 +141,8 @@ function DashboardPage() {
               </span>
             )}
           </button>
-        </div>
-      )}
+        )}
+      </div>
       {userRole === 'user' && (
         <div style={{ background: '#eff6ff', color: '#1e40af', padding: '16px', borderRadius: '12px', border: '1px solid #bfdbfe', marginBottom: '32px', display: 'flex', alignItems: 'center', fontSize: '16px' }}>
           <span style={{ marginRight: '12px', fontSize: '20px' }}>ℹ️</span>
@@ -153,9 +156,8 @@ function DashboardPage() {
         <FilterInput value={filterDate} type="date" onChange={(e) => setFilterDate(e.target.value)} />
         <FilterSelect value={filterShift} onChange={(e) => setFilterShift(e.target.value)}>
           <option value="">All shifts</option>
-          <option value="Morning">Morning</option>
-          <option value="Afternoon">Afternoon</option>
-          <option value="Night">Night</option>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
         </FilterSelect>
       </FilterRow>
 
@@ -278,11 +280,11 @@ function DashboardPage() {
       {alertsOpen && (
         <AlertOverlay onClick={() => setAlertsOpen(false)}>
           <AlertModalContainer onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '2px solid #e2e8f0', paddingBottom: '12px' }}>
-              <h2 style={{ margin: 0, color: '#1e293b', fontSize: '24px' }}>System Alerts</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '2px solid', paddingBottom: '12px', borderColor: 'inherit' }}>
+              <h2 style={{ margin: 0, fontSize: '24px', color: 'inherit' }}>System Alerts</h2>
               <button
                 onClick={() => setAlertsOpen(false)}
-                style={{ background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', color: '#64748b' }}
+                style={{ background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', color: 'inherit', opacity: 0.7 }}
               >
                 &times;
               </button>
@@ -293,20 +295,24 @@ function DashboardPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                   <div>Pending Leave Requests: {pendingLeaves.length}</div>
                   <div style={{ marginTop: '12px', fontSize: '16px', fontWeight: 'normal' }}>
-                    {pendingLeaves.map(e => (
-                      <div
-                        key={e.id}
-                        style={{ marginBottom: '6px', color: '#b45309', cursor: 'pointer' }}
-                        onClick={() => {
-                          setAlertsOpen(false);
-                          navigate('/calendar', { state: { openEventId: e.id } });
-                        }}
-                        onMouseOver={(ev) => ev.currentTarget.style.textDecoration = 'underline'}
-                        onMouseOut={(ev) => ev.currentTarget.style.textDecoration = 'none'}
-                      >
-                        • <strong>{e.title ? e.title.split(' - ')[0] : 'Unknown User'}</strong> requested for {e.date}
-                      </div>
-                    ))}
+                    {pendingLeaves.map(e => {
+                      const ownerName = e.title ? e.title.split(' - ')[0] : '';
+                      const displayName = ownerName && ownerName.toLowerCase() !== 'undefined' ? ownerName : 'Unknown User';
+                      return (
+                        <div
+                          key={e.id}
+                          style={{ marginBottom: '6px', color: '#b45309', cursor: 'pointer' }}
+                          onClick={() => {
+                            setAlertsOpen(false);
+                            navigate('/calendar', { state: { openEventId: e.id } });
+                          }}
+                          onMouseOver={(ev) => ev.currentTarget.style.textDecoration = 'underline'}
+                          onMouseOut={(ev) => ev.currentTarget.style.textDecoration = 'none'}
+                        >
+                          • <strong>{displayName}</strong> requested for {e.date}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </AlertCard>
@@ -332,10 +338,7 @@ const PageContainer = styled.div`
   max-width: 1400px;
   margin: 0 auto;
   min-height: 100vh;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #0f172a;
-  background: #f8fafc;
-
+  
   @media (max-width: 768px) {
     padding: 20px 16px;
   }
@@ -351,11 +354,11 @@ const Button = styled.button`
   transition: all 0.2s ease;
   font-size: 18px;
   font-weight: 600;
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 
   &:hover {
     transform: scale(1.03);
-    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
     background: #1d4ed8;
   }
 
@@ -376,21 +379,21 @@ const FilterRow = styled.div`
 
 const FilterInput = styled.input`
   padding: 16px 20px;
-  background: #ffffff;
-  border: 2px solid #cbd5e1;
+  background: ${({ theme }) => theme.bg.input};
+  border: 2px solid ${({ theme }) => theme.border.main};
   border-radius: 10px;
   font-size: 18px;
-  color: #0f172a;
+  color: ${({ theme }) => theme.text.primary};
   outline: none;
   transition: all 0.2s ease;
   flex: 1;
 
   &::placeholder {
-    color: #64748b;
+    color: ${({ theme }) => theme.text.muted};
   }
 
   &:focus {
-    border-color: #2563eb;
+    border-color: ${({ theme }) => theme.primary.main};
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
   }
 
@@ -402,18 +405,18 @@ const FilterInput = styled.input`
 
 const FilterSelect = styled.select`
   padding: 16px 20px;
-  background: #ffffff;
-  border: 2px solid #cbd5e1;
+  background: ${({ theme }) => theme.bg.input};
+  border: 2px solid ${({ theme }) => theme.border.main};
   border-radius: 10px;
   font-size: 18px;
-  color: #0f172a;
+  color: ${({ theme }) => theme.text.primary};
   outline: none;
   transition: all 0.2s ease;
   appearance: none;
   flex: 1;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: ${({ theme }) => theme.primary.main};
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
   }
 
@@ -430,11 +433,11 @@ const FilterSelect = styled.select`
 const SectionTitle = styled.h3`
   margin-top: 40px;
   margin-bottom: 20px;
-  border-bottom: 3px solid #e2e8f0;
+  border-bottom: 3px solid ${({ theme }) => theme.border.main};
   padding-bottom: 12px;
   font-size: 28px;
   font-weight: 700;
-  color: #1e293b;
+  color: ${({ theme }) => theme.text.primary};
 
   @media (max-width: 768px) {
     font-size: 22px;
@@ -456,12 +459,12 @@ const CardGrid = styled.div`
 `;
 
 const Card = styled.div`
-  background: ${(p) => p.color || "#ffffff"};
+  background: ${(p) => p.color || '#ffffff'};
   color: #0f172a;
   padding: 24px;
   border-radius: 12px;
   min-height: 120px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #e2e8f0;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
   font-size: 20px;
   position: relative;
@@ -527,19 +530,19 @@ const UpcomingList = styled.div`
   max-height: 320px;
   overflow-y: auto;
   padding: 16px;
-  border: 2px solid #e2e8f0;
+  border: 2px solid ${({ theme }) => theme.border.main};
   border-radius: 12px;
-  background: #f1f5f9;
+  background: ${({ theme }) => theme.bg.hover};
   
   &::-webkit-scrollbar {
     width: 10px;
   }
   &::-webkit-scrollbar-track {
-    background: #e2e8f0;
+    background: ${({ theme }) => theme.border.main};
     border-radius: 5px;
   }
   &::-webkit-scrollbar-thumb {
-    background: #94a3b8;
+    background: ${({ theme }) => theme.text.muted};
     border-radius: 5px;
   }
 `;
@@ -548,19 +551,20 @@ const UpcomingItem = styled.div`
   margin-bottom: 16px;
   padding: 18px;
   border-radius: 10px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  background: ${({ theme }) => theme.bg.card};
+  border: 1px solid ${({ theme }) => theme.border.main};
   font-size: 20px;
   transition: all 0.2s ease;
+  color: ${({ theme }) => theme.text.primary};
 
   &:hover {
     transform: scale(1.01);
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    border-color: #94a3b8;
+    border-color: ${({ theme }) => theme.text.muted};
   }
 
   strong {
-    color: #0f62fe;
+    color: ${({ theme }) => theme.primary.main};
     font-weight: 700;
   }
 
@@ -616,7 +620,8 @@ const AlertOverlay = styled.div`
 `;
 
 const AlertModalContainer = styled.div`
-  background: #ffffff;
+  background: ${({ theme }) => theme.bg.card};
+  color: ${({ theme }) => theme.text.primary};
   padding: 32px;
   border-radius: 16px;
   width: 90%;

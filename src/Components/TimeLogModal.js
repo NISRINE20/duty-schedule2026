@@ -19,6 +19,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
   const [requestLeaveType, setRequestLeaveType] = useState('Sick Leave');
   const [requestOtherStr, setRequestOtherStr] = useState('');
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState('');
 
   const userRole = localStorage.getItem('authRole');
   const authName = localStorage.getItem('authName');
@@ -38,6 +39,33 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
       setRequestLeaveType('Sick Leave');
       setRequestOtherStr('');
       setConfirmWithdraw(false);
+    }
+  }, [event]);
+
+  // Countdown timer for denied leave requests
+  useEffect(() => {
+    if (event?.leaveRequestDenied && event?.leaveRequestDeniedAt) {
+      const updateTimeRemaining = () => {
+        const deniedAt = new Date(event.leaveRequestDeniedAt);
+        const deletionTime = new Date(deniedAt.getTime() + 24 * 60 * 60 * 1000); // 24 hours later
+        const now = new Date();
+        const remainingMs = deletionTime - now;
+
+        if (remainingMs <= 0) {
+          setTimeRemaining('This request will be deleted soon');
+        } else {
+          const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+          const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+          setTimeRemaining(`${hours}h ${minutes}m remaining`);
+        }
+      };
+
+      updateTimeRemaining();
+      const interval = setInterval(updateTimeRemaining, 60000); // Update every minute
+
+      return () => clearInterval(interval);
+    } else {
+      setTimeRemaining('');
     }
   }, [event]);
 
@@ -107,6 +135,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
   const eventName = event.title ? event.title.split(" - ")[0] : "";
   const isOwnSchedule = authName && eventName && authName.toLowerCase() === eventName.toLowerCase();
   const canLogTime = userRole === 'user' && isOwnSchedule;
+  const isReadOnly = event.leaveRequestDenied === true;
 
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -122,7 +151,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
   const canLogInToday = isToday;
   const canLogOutToday = isToday || (event?.isOvernight && isNextDay);
   const cleanEventTitle = event.title ? event.title.replace('✅ ', '').replace(/ - Leave(Request)?$/i, '') : '';
-  const modalHeading = event.isLeaveRequestPending ? 'Leave Request Details' : canLogTime ? 'Log Time' : event.isLeave ? 'Leave Details' : 'Duty Details';
+  const modalHeading = event.leaveRequestDenied ? 'Leave Request Denied' : event.isLeaveRequestPending ? 'Leave Request Details' : canLogTime ? 'Log Time' : event.isLeave ? 'Leave Details' : 'Duty Details';
   const isExpanded = isConverting || isRequesting;
 
   return (
@@ -144,7 +173,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
         <Grid $isExpanded={isExpanded}>
           <Column>
             {event.scheduledTimeIn && !event.isLeave && (
-              <div style={{ marginBottom: '15px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <InfoBox>
                 <div style={{ fontSize: '15px', color: '#475569' }}>
                   <strong>Scheduled Time:</strong> {event.scheduledTimeIn} - {event.scheduledTimeOut || '?'}
                 </div>
@@ -153,7 +182,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                     Status: {statusLabel}
                   </div>
                 )}
-              </div>
+              </InfoBox>
             )}
 
             {event.isLeave && (
@@ -172,7 +201,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
             {!event.isLeave && !event.leaveRequestDenied && !event.isLeaveRequestPending && (
               <>
                 {!canLogTime || event.isLeaveRequestPending ? (
-                  <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+                  <InfoBox>
                     <div style={{ fontSize: '15px', color: '#334155', marginBottom: '12px' }}>
                       <strong>Actual Time In:</strong> <span style={{ color: timeIn ? '#0f172a' : '#94a3b8' }}>{timeIn || 'Not logged yet'}</span>
                     </div>
@@ -188,7 +217,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                         You can only log time for your own assigned schedules.
                       </div>
                     )}
-                  </div>
+                  </InfoBox>
                 ) : (
                   <div style={{ marginTop: '10px', marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {!canLogInToday && !canLogOutToday && (
@@ -201,7 +230,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                         🌙 Overnight Shift: Time Out can be logged the next day.
                       </div>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <RowInfoBox>
                       <div style={{ fontSize: '15px', color: '#475569' }}>
                         <strong>Actual Time In:</strong><br />{timeIn || 'Not logged yet'}
                       </div>
@@ -225,9 +254,9 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                       ) : (
                         <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ Recorded</span>
                       )}
-                    </div>
+                    </RowInfoBox>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <RowInfoBox>
                       <div style={{ fontSize: '15px', color: '#475569' }}>
                         <strong>Actual Time Out:</strong><br />{timeOut || 'Not logged yet'}
                         {timeOut && statusLabel && statusLabel.includes('Early Timeout') && (
@@ -254,7 +283,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                       ) : (
                         <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ Recorded</span>
                       )}
-                    </div>
+                    </RowInfoBox>
 
                     {locationError && (
                       <div style={{ color: '#ef4444', fontSize: '14px', fontWeight: 'bold', background: '#fef2f2', padding: '10px', borderRadius: '6px', border: '1px solid #fca5a5' }}>
@@ -266,7 +295,22 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
               </>
             )}
 
-            {userRole === 'admin' && !event.isLeaveRequestPending ? (
+            {userRole === 'admin' && event.leaveRequestDenied && !event.isLeaveRequestPending && (
+              <div style={{ marginBottom: '16px', padding: '12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', fontWeight: 'bold' }}>
+                ❌ Leave request has been denied.
+                {event.leaveType && (
+                  <div style={{ marginTop: '8px', fontWeight: 'normal', color: '#7f1d1d' }}>
+                    Requested leave type: {event.leaveType}
+                  </div>
+                )}
+                {timeRemaining && (
+                  <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 'normal', color: '#dc2626' }}>
+                    ⏰ This request will be automatically deleted in {timeRemaining}
+                  </div>
+                )}
+              </div>
+            )}
+            {userRole === 'admin' && !event.leaveRequestDenied && !event.isLeaveRequestPending ? (
               <>
                 <Label>Admin Status:</Label>
                 <CheckboxLabel style={{ cursor: 'pointer' }}>
@@ -302,6 +346,11 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                 {event.leaveRequestDenied && !event.isLeaveRequestPending && !isRequesting && (
                   <div style={{ background: '#fef2f2', padding: '12px', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c', marginBottom: '16px', fontWeight: 'bold' }}>
                     ❌ Your leave request was denied by the administrator.
+                    {timeRemaining && (
+                      <div style={{ fontSize: '13px', fontWeight: 'normal', marginTop: '8px', color: '#dc2626' }}>
+                        ⏰ This request will be automatically deleted in {timeRemaining}
+                      </div>
+                    )}
                   </div>
                 )}
                 {!event.isLeave && !event.isLeaveRequestPending && !isRequesting && !event.leaveRequestDenied && (
@@ -381,17 +430,31 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                 )}
                 <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
                   <Button primary style={{flex: 1, backgroundColor: '#16a34a'}} onClick={() => {
-                      const eventName = event.title ? event.title.split(" - ")[0].replace('✅ ', '') : "";
+                      const eventName = event.title ? event.title.replace(/^✅\s*|^❌\s*/g, '').split(" - ")[0] : "";
                       onSave({
-                        timeIn: '', timeOut: '', isConfirmed: true, isLeave: true, leaveType: event.pendingLeaveType,
-                        isLeaveRequestPending: false, pendingLeaveType: '', leaveRequestDenied: false,
-                        title: `${eventName} - Leave`, leaveDays: event.leaveDays, excludeWeekends: event.excludeWeekends
+                        timeIn: '',
+                        timeOut: '',
+                        isConfirmed: true,
+                        isLeave: true,
+                        leaveType: event.pendingLeaveType,
+                        isLeaveRequestPending: false,
+                        pendingLeaveType: '',
+                        leaveRequestDenied: false,
+                        title: `${eventName} - ${event.pendingLeaveType}`,
+                        leaveDays: event.leaveDays,
+                        excludeWeekends: event.excludeWeekends
                       });
                       onClose();
                   }}>Approve</Button>
                   <Button style={{flex: 1, backgroundColor: '#ef4444', color: '#fff'}} onClick={() => {
+                      const eventName = event.title ? event.title.replace(/^✅\s*|^❌\s*/g, '').split(" - ")[0] : "";
                       onSave({
-                        isLeaveRequestPending: false, pendingLeaveType: '', leaveRequestDenied: true
+                        isLeaveRequestPending: false,
+                        pendingLeaveType: '',
+                        leaveRequestDenied: true,
+                        leaveRequestDeniedAt: new Date().toISOString(),
+                        leaveType: event.pendingLeaveType || event.leaveType || '',
+                        title: `${eventName} - Leave Request Denied`
                       });
                       onClose();
                   }}>Deny</Button>
@@ -403,7 +466,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
           {(isConverting || isRequesting) && (
             <Column>
               {isConverting && (
-                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <InfoBox style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px', borderRadius: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <Label style={{ marginTop: 0, marginBottom: '8px', color: '#334155', fontSize: '15px' }}>Leave Type:</Label>
                     <Select value={conversionLeaveType} onChange={e => setConversionLeaveType(e.target.value)}>
@@ -429,11 +492,11 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                   >
                     Cancel Conversion
                   </Button>
-                </div>
+                </InfoBox>
               )}
 
               {isRequesting && (
-                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <InfoBox style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px', borderRadius: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <Label style={{ marginTop: 0, marginBottom: '8px', color: '#334155', fontSize: '15px' }}>Request Leave Type:</Label>
                     <Select value={requestLeaveType} onChange={e => setRequestLeaveType(e.target.value)}>
@@ -459,7 +522,7 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
                   >
                     Cancel Request
                   </Button>
-                </div>
+                </InfoBox>
               )}
 
             </Column>
@@ -490,9 +553,11 @@ function TimeLogModal({ isOpen, onClose, event, onSave, onDelete }) {
             </Button>
           )}
           <Button onClick={onClose}>Cancel</Button>
-          <Button primary onClick={handleSave}>
-            Save
-          </Button>
+          {!isReadOnly && (
+            <Button primary onClick={handleSave}>
+              Save
+            </Button>
+          )}
         </ButtonGroup>
       </ModalContainer>
     </Overlay>
@@ -508,7 +573,7 @@ const Overlay = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(15, 23, 42, 0.5);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -518,7 +583,8 @@ const Overlay = styled.div`
 `;
 
 const ModalContainer = styled.div`
-  background: white;
+  background: #ffffff;
+  color: #0f172a;
   padding: 25px;
   border-radius: 15px;
   width: min(90%, 930px);
@@ -527,6 +593,7 @@ const ModalContainer = styled.div`
   overflow-y: auto;
   transition: all 0.25s ease-in-out;
   position: relative;
+  border: 1px solid #e2e8f0;
 
   @media (max-width: 900px) {
     max-width: ${props => props.$isExpanded ? '88vw' : '520px'};
@@ -563,10 +630,10 @@ const CloseButton = styled.button`
   position: absolute;
   top: 15px;
   right: 15px;
-  background: none;
+  background: #ffffff;
   border: none;
   font-size: 24px;
-  color: #64748b;
+  color: #475569;
   cursor: pointer;
   padding: 5px;
   border-radius: 50%;
@@ -579,7 +646,7 @@ const CloseButton = styled.button`
 
   &:hover {
     background: #f1f5f9;
-    color: #334155;
+    color: #0f172a;
   }
 `;
 
@@ -609,10 +676,11 @@ const Column = styled.div`
 const Input = styled.input`
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #cbd5e1;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
   font-size: 16px;
   color: #0f172a;
+  background: #ffffff;
   outline: none;
   transition: border-color 0.2s;
   box-sizing: border-box;
@@ -625,13 +693,13 @@ const Input = styled.input`
 const Select = styled.select`
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #cbd5e1;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
   font-size: 16px;
   color: #0f172a;
   outline: none;
   transition: border-color 0.2s;
-  background: white;
+  background: #ffffff;
   box-sizing: border-box;
 
   &:focus {
@@ -643,6 +711,7 @@ const Label = styled.label`
   display: block;
   margin-top: 15px;
   font-weight: bold;
+  color: #0f172a;
 `;
 
 const ButtonGroup = styled.div`
@@ -667,15 +736,15 @@ const Button = styled.button`
   border: none;
   cursor: pointer;
   border-radius: 8px;
-  background: ${props => props.primary ? "#2563eb" : "#f1f5f9"};
-  color: ${props => props.primary ? "white" : "#475569"};
+  background: ${props => props.primary ? "#2563eb" : "#ffffff"};
+  color: ${props => props.primary ? "#ffffff" : "#0f172a"};
   font-weight: 600;
   font-size: 14px;
   transition: all 0.2s;
   min-height: 40px;
 
   &:hover {
-    background: ${props => props.primary ? "#1d4ed8" : "#e2e8f0"};
+    background: ${props => props.primary ? "#1d4ed8" : "#f1f5f9"};
     transform: translateY(-1px);
   }
 
@@ -696,6 +765,7 @@ const CheckboxLabel = styled.label`
   gap: 10px;
   margin-top: 10px;
   font-size: 16px;
+  color: #0f172a;
   cursor: pointer;
   
   input {
@@ -703,4 +773,20 @@ const CheckboxLabel = styled.label`
     height: 20px;
     cursor: pointer;
   }
+`;
+
+const InfoBox = styled.div`
+  margin-bottom: 15px;
+  padding: 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+`;
+
+const RowInfoBox = styled(InfoBox)`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 `;

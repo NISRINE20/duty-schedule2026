@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import DashboardPage from "./Pages/DashboardPage";
 import CalendarPage from "./Pages/CalendarPage";
 import TemplatesPage from "./Pages/TemplatesPage";
@@ -8,22 +9,54 @@ import SummaryPage from "./Pages/SummaryPage";
 import Navbar from "./Components/Navbar";
 import GlobalStyles from "./styles/GlobalStyles";
 import styled from "styled-components";
+import { db } from './firebase';
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
-// ProtectedRoute component to handle auth redirects
-function ProtectedRoute({ children, requiredRole }) {
-  const authRole = localStorage.getItem("authRole");
-  if (!authRole) {
-    return <Navigate to="/login" replace />;
+// Cleanup function for denied leave requests older than 24 hours
+const cleanupDeniedLeaveRequests = async () => {
+  try {
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+    
+    const q = query(
+      collection(db, "dutyEvents"),
+      where("leaveRequestDenied", "==", true)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const deletePromises = [];
+    
+    querySnapshot.forEach((document) => {
+      const data = document.data();
+      if (data.leaveRequestDeniedAt) {
+        const deniedAt = new Date(data.leaveRequestDeniedAt);
+        if (deniedAt < twentyFourHoursAgo) {
+          deletePromises.push(deleteDoc(doc(db, "dutyEvents", document.id)));
+        }
+      }
+    });
+    
+    if (deletePromises.length > 0) {
+      await Promise.all(deletePromises);
+      console.log(`Cleaned up ${deletePromises.length} denied leave requests older than 24 hours`);
+    }
+  } catch (error) {
+    console.error("Error cleaning up denied leave requests:", error);
   }
-  if (requiredRole && authRole !== requiredRole) {
-    return <Navigate to="/" replace />;
-  }
-  return children;
-}
+};
 
 function App() {
   const location = useLocation();
   const isAuthPage = location.pathname === "/login" || location.pathname === "/signup";
+
+  // Run cleanup on app start and every hour
+  useEffect(() => {
+    cleanupDeniedLeaveRequests();
+    
+    const interval = setInterval(cleanupDeniedLeaveRequests, 60 * 60 * 1000); // Run every hour
+    
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <AppContainer>
@@ -42,6 +75,18 @@ function App() {
       </MainContent>
     </AppContainer>
   );
+}
+
+// ProtectedRoute component to handle auth redirects
+function ProtectedRoute({ children, requiredRole }) {
+  const authRole = localStorage.getItem("authRole");
+  if (!authRole) {
+    return <Navigate to="/login" replace />;
+  }
+  if (requiredRole && authRole !== requiredRole) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
 }
 
 const AppContainer = styled.div`

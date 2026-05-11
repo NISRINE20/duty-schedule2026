@@ -14,10 +14,11 @@ const GlobalStyles = createGlobalStyle`
 
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    color: #0f172a;
+    color: ${({ theme }) => theme.text.primary};
     -webkit-font-smoothing: antialiased;
     line-height: auto;
-    background-color: #f8fafc;
+    background-color: ${({ theme }) => theme.bg.main};
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   body::before {
@@ -28,7 +29,7 @@ const GlobalStyles = createGlobalStyle`
     background-size: min(80vw, 950px); /* Keeps it from blowing up massively, perfectly contained */
     background-position: center;
     background-repeat: no-repeat;
-    opacity: 0.10; /* Lower opacity slightly so it's a cleaner watermark */
+    opacity: 0.10;
     z-index: -1;
     pointer-events: none;
   }

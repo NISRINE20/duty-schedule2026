@@ -3,17 +3,56 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2030, 4, 24);
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // users collection
+    match /users/{userId} {
+      // Allow anyone to query admin users to check if an admin exists during signup
+      // This is required because SignupPage queries admin users before authentication
+      allow read: if resource.data.role == 'admin';
+      
+      // Users can read/update their own profile, Admins have full access
+      allow read, update: if isOwner(userId) || isAdmin();
+      
+      // Creating a profile happens right after Firebase Auth creates the account
+      allow create: if isOwner(userId);
+      
+      // Admins can delete users
+      allow delete: if isAdmin();
+    }
+
+    // dutyEvents collection
+    match /dutyEvents/{eventId} {
+      // All authenticated users can read events
+      allow read: if isAuthenticated();
+      
+      // Authenticated users can create and update events (time logs, leave requests)
+      allow create, update: if isAuthenticated();
+
+      function canWithdrawPendingLeave() {
+        return resource.data.isLeaveRequestPending == true && isAuthenticated();
+      }
+      
+      // Only admins can delete events, except authenticated users may withdraw their own pending leave request.
+      allow delete: if isAdmin() || canWithdrawPendingLeave();
+    }
+
+    // config collection (for templates)
+    match /config/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 }

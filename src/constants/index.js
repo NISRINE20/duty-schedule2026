@@ -8,7 +8,7 @@ export const LEAVE_TYPES = [
   'Mental Wellness Break (MWB)',
 ];
 
-export const SHIFT_TYPES = ['Morning', 'Afternoon', 'Night', 'Leave'];
+export const SHIFT_TYPES = ['AM', 'PM', 'Leave'];
 
 export const ROLES = {
   ADMIN: 'admin',
@@ -18,6 +18,7 @@ export const ROLES = {
 export const STORAGE_KEYS = {
   AUTH_ROLE: 'authRole',
   AUTH_NAME: 'authName',
+  AUTH_UID: 'authUid',
 };
 
 export const ROUTE_PATHS = {

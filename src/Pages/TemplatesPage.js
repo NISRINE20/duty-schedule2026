@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
+import { STORAGE_KEYS } from '../constants';
 import { doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import Loader from '../Components/Loader';
 
@@ -142,6 +143,8 @@ function TemplatesPage() {
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
         const dayTemplates = templates[dayName] || [];
 
+        const currentUserId = auth.currentUser?.uid || localStorage.getItem(STORAGE_KEYS.AUTH_UID) || "";
+
         for (const template of dayTemplates) {
           if (template.name && template.shift) {
             const targetTitle = `${template.name} - ${template.shift}`;
@@ -168,7 +171,8 @@ function TemplatesPage() {
                 excludeWeekends: false,
                 isLeaveRequestPending: false,
                 pendingLeaveType: "",
-                leaveRequestDenied: false
+                leaveRequestDenied: false,
+                userId: currentUserId
               });
               addedCount++;
             }
@@ -210,9 +214,8 @@ function TemplatesPage() {
                       onChange={(e) => handleChange(day, index, 'shift', e.target.value)}
                     >
                       <option value="">Shift</option>
-                      <option value="Morning">Morning</option>
-                      <option value="Afternoon">Afternoon</option>
-                      <option value="Night">Night</option>
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
                     </Select>
                   </InputGroup>
                   <InputGroup>
@@ -280,13 +283,13 @@ const Container = styled.div`
 const Title = styled.h2`
   margin-bottom: 8px;
   font-size: clamp(22px, 3.5vw, 28px);
-  color: #1e293b;
+  color: ${({ theme }) => theme.text.primary};
   font-weight: 700;
 `;
 
 const Description = styled.p`
   margin-bottom: 24px;
-  color: #475569;
+  color: ${({ theme }) => theme.text.secondary};
   font-size: clamp(15px, 2.5vw, 18px);
 `;
 
@@ -302,10 +305,10 @@ const TemplateForm = styled.div`
 `;
 
 const DayCard = styled.div`
-  background: #ffffff;
+  background: ${({ theme }) => theme.bg.card};
   padding: 16px;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid ${({ theme }) => theme.border.main};
   box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
   border-top: 6px solid ${(p) => p.$dayColor || '#2563eb'};
   display: flex;
@@ -317,13 +320,13 @@ const DayHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid ${({ theme }) => theme.border.main};
   padding-bottom: 8px;
 `;
 
 const DayLabel = styled.h3`
   font-size: 22px;
-  color: #0f172a;
+  color: ${({ theme }) => theme.text.primary};
   margin: 0;
 `;
 
@@ -337,16 +340,16 @@ const RowContainer = styled.div`
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #f8fafc;
+  background: ${({ theme }) => theme.bg.main};
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid ${({ theme }) => theme.border.main};
   position: relative;
   transition: all 0.2s;
 
   &:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-    border-color: #cbd5e1;
+    border-color: ${({ theme }) => theme.border.focus};
   }
 `;
 
@@ -363,34 +366,38 @@ const InputGroup = styled.div`
 const Input = styled.input`
   flex: 1;
   padding: 8px 10px;
-  border: 2px solid #cbd5e1;
+  border: 2px solid ${({ theme }) => theme.border.main};
   border-radius: 6px;
   font-size: 14px;
+  background: ${({ theme }) => theme.bg.input};
+  color: ${({ theme }) => theme.text.primary};
   outline: none;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: ${({ theme }) => theme.primary.main};
   }
 `;
 
 const Select = styled.select`
   flex: 1;
   padding: 8px 10px;
-  border: 2px solid #cbd5e1;
+  border: 2px solid ${({ theme }) => theme.border.main};
   border-radius: 6px;
   font-size: 14px;
+  background: ${({ theme }) => theme.bg.input};
+  color: ${({ theme }) => theme.text.primary};
   outline: none;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: ${({ theme }) => theme.primary.main};
   }
 `;
 
 const AddButton = styled.button`
   padding: 8px 16px;
   background: transparent;
-  color: #2563eb;
-  border: 2px solid #2563eb;
+  color: ${({ theme }) => theme.primary.main};
+  border: 2px solid ${({ theme }) => theme.primary.main};
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
@@ -398,7 +405,7 @@ const AddButton = styled.button`
   transition: all 0.2s;
 
   &:hover {
-    background: #eff6ff;
+    background: ${({ theme }) => theme.bg.accent};
   }
 `;
 
@@ -409,7 +416,7 @@ const RemoveButton = styled.button`
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #ffffff;
+  background: ${({ theme }) => theme.bg.card};
   color: #ef4444;
   border: 2px solid #ef4444;
   cursor: pointer;
@@ -443,9 +450,9 @@ const ButtonContainer = styled.div`
 
 const SaveButton = styled.button`
   padding: 16px 28px;
-  background: #ffffff;
-  color: #2563eb;
-  border: 2px solid #2563eb;
+  background: ${({ theme }) => theme.bg.card};
+  color: ${({ theme }) => theme.primary.main};
+  border: 2px solid ${({ theme }) => theme.primary.main};
   border-radius: 10px;
   cursor: pointer;
   font-size: 18px;
@@ -454,14 +461,14 @@ const SaveButton = styled.button`
   transition: all 0.2s;
 
   &:hover {
-    background: #eff6ff;
+    background: ${({ theme }) => theme.bg.accent};
     transform: translateY(-2px);
   }
 `;
 
 const ApplyButton = styled.button`
   padding: 16px 28px;
-  background: #2563eb;
+  background: ${({ theme }) => theme.primary.main};
   color: white;
   border: none;
   border-radius: 10px;
@@ -472,7 +479,7 @@ const ApplyButton = styled.button`
   transition: all 0.2s;
 
   &:hover {
-    background: #1d4ed8;
+    background: ${({ theme }) => theme.primary.hover};
     transform: translateY(-2px);
   }
 `;
@@ -487,7 +494,8 @@ const Overlay = styled.div`
 `;
 
 const ModalContainer = styled.div`
-  background: white;
+  background: ${({ theme }) => theme.bg.card};
+  color: ${({ theme }) => theme.text.primary};
   padding: 32px 24px;
   border-radius: 16px;
   text-align: center;
@@ -510,13 +518,13 @@ const ModalTitle = styled.h2`
 
 const ModalMessage = styled.p`
   margin: 0 0 24px 0;
-  color: #475569;
+  color: ${({ theme }) => theme.text.secondary};
   font-size: 16px;
   line-height: 1.5;
 `;
 
 const CloseBtn = styled.button`
-  background: #2563eb;
+  background: ${({ theme }) => theme.primary.main};
   color: white;
   border: none;
   padding: 12px 32px;
@@ -527,6 +535,6 @@ const CloseBtn = styled.button`
   transition: all 0.2s;
 
   &:hover {
-    background: #1d4ed8;
+    background: ${({ theme }) => theme.primary.hover};
   }
 `;

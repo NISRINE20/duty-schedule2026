@@ -8,7 +8,9 @@ import styled from "styled-components";
 import ScheduleModal from "../Components/ScheduleModal";
 import DayScheduleSidebar from "../Components/DayScheduleSidebar";
 import TimeLogModal from "../Components/TimeLogModal";
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
+import { STORAGE_KEYS } from '../constants';
+import { calculateLeaveEndDate } from '../utils/leaveCalculations';
 import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import Loader from '../Components/Loader';
 
@@ -17,9 +19,11 @@ function CalendarPage() {
   const location = useLocation();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [timeLogOpen, setTimeLogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [modalType, setModalType] = useState('schedule');
 
@@ -62,36 +66,72 @@ function CalendarPage() {
 
   const userRole = localStorage.getItem('authRole');
   const authName = localStorage.getItem('authName') || '';
+  const currentUserId = auth.currentUser?.uid || localStorage.getItem(STORAGE_KEYS.AUTH_UID) || '';
 
   const visibleEvents = events.filter((e) => {
     if (userRole === 'admin') return true;
     const owner = e.title ? e.title.split(' - ')[0] : '';
     if (e.isLeaveRequestPending || e.leaveRequestDenied) {
-      return owner.toLowerCase() === authName.toLowerCase();
+      return e.userId === currentUserId || owner.toLowerCase() === authName.toLowerCase();
     }
     return true;
   });
+
+  const handleEditEvent = (eventData) => {
+    setSelectedDate(eventData.date);
+    setModalType(eventData.isLeave ? 'leave' : 'schedule');
+    setEditingEvent(eventData);
+    setSidebarOpen(false);
+    setTimeLogOpen(false);
+    setModalOpen(true);
+  };
+
+  const handleUpdate = async (updatedFields, eventId) => {
+    setIsLoading(true);
+    try {
+      await updateDoc(doc(db, 'dutyEvents', eventId), updatedFields);
+      setEvents((prevEvents) => prevEvents.map((evt) => evt.id === eventId ? { ...evt, ...updatedFields } : evt));
+      setModalOpen(false);
+      setEditingEvent(null);
+    } catch (e) {
+      alert('Error updating event: ' + e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   console.log('Rendering CalendarPage, modalOpen:', modalOpen, 'selectedDate:', selectedDate);
 
   const handleDateClick = (info) => {
     setSelectedDate(info.dateStr);
+    setSidebarOpen(true);
   };
 
   const formattedEvents = visibleEvents.map((e) => {
     const name = e.title ? e.title.split(" - ")[0] : "";
     let bgColor = e.isLeave ? "#94a3b8" : getColorForName(name);
     if (e.isLeaveRequestPending) bgColor = "#fef08a";
+    if (e.leaveRequestDenied) bgColor = "#fee2e2";
 
     let titleStatus = e.title;
     if (e.isLeave) {
       titleStatus = `${name} - ${e.leaveType}`;
-    } else if (e.isConfirmed) {
-      titleStatus = `✅ ${e.title}`;
+      if (e.isConfirmed) {
+        titleStatus = `✅ ${titleStatus}`;
+      }
     } else if (e.leaveRequestDenied) {
-      titleStatus = `❌ ${e.title}`;
+      titleStatus = `❌ ${name} - Leave Request Denied`;
     } else if (e.isLeaveRequestPending) {
       titleStatus = `⏳ PENDING: ${name} - ${e.pendingLeaveType} Request`;
+    } else if (e.isConfirmed) {
+      titleStatus = `✅ ${e.title}`;
+    }
+
+    if (e.isOvernight) {
+      titleStatus += " (Overnight)";
+    }
+    if ((e.isLeave || e.leaveRequestDenied) && e.leaveEndDate && e.leaveEndDate !== e.date) {
+      titleStatus += ` (${e.date} - ${e.leaveEndDate})`;
     }
 
     let eventProps = {
@@ -100,19 +140,38 @@ function CalendarPage() {
       title: titleStatus,
       backgroundColor: bgColor,
       borderColor: bgColor,
-      textColor: e.isLeave ? "#ffffff" : e.isLeaveRequestPending ? "#92400e" : "#0f172a",
+      textColor: e.isLeave ? "#ffffff" : e.leaveRequestDenied ? "#991b1b" : e.isLeaveRequestPending ? "#92400e" : "#0f172a",
     };
 
-    if (e.leaveEndDate) {
-      const d = new Date(e.leaveEndDate);
-      d.setDate(d.getDate() + 1);
-      eventProps.end = d.toISOString().split('T')[0];
+    if (e.isLeave || e.leaveRequestDenied) {
+      // Leave events and denied leave requests are all-day entries
       eventProps.allDay = true;
-    } else if (e.isOvernight && e.date) {
-      const d = new Date(e.date);
-      // FullCalendar's all-day 'end' is exclusive, meaning we need to add 2 days to span exactly 2 boxes (today and tomorrow).
-      d.setDate(d.getDate() + 2);
-      eventProps.end = d.toISOString().split('T')[0];
+      if (e.leaveEndDate) {
+        const d = new Date(e.leaveEndDate);
+        d.setDate(d.getDate() + 1);
+        eventProps.end = d.toISOString().split('T')[0];
+      } else if (e.leaveDays > 1 && e.date) {
+        const calculatedEndDate = calculateLeaveEndDate(e.date, e.leaveDays, e.excludeWeekends);
+        if (calculatedEndDate && calculatedEndDate !== e.date) {
+          const d = new Date(calculatedEndDate);
+          d.setDate(d.getDate() + 1);
+          eventProps.end = d.toISOString().split('T')[0];
+        }
+      }
+    } else {
+      // Regular schedule events are timed
+      eventProps.allDay = false;
+      if (e.scheduledTimeIn && e.scheduledTimeOut) {
+        eventProps.start = `${e.date}T${e.scheduledTimeIn}`;
+        if (e.isOvernight) {
+          const nextDay = new Date(e.date);
+          nextDay.setDate(nextDay.getDate() + 1);
+          const nextDayStr = nextDay.toISOString().split('T')[0];
+          eventProps.end = `${nextDayStr}T${e.scheduledTimeOut}`;
+        } else {
+          eventProps.end = `${e.date}T${e.scheduledTimeOut}`;
+        }
+      }
     }
 
     return eventProps;
@@ -147,6 +206,7 @@ function CalendarPage() {
         return;
       }
 
+      const currentUserId = auth.currentUser?.uid || localStorage.getItem(STORAGE_KEYS.AUTH_UID) || "";
       const promises = datesToCreate.map(date => 
         addDoc(collection(db, 'dutyEvents'), {
           title: modalType === 'leave' ? `${name} - Leave Request` : `${name} - ${shift}`,
@@ -157,14 +217,15 @@ function CalendarPage() {
           scheduledTimeOut: scheduledTimeOut || "",
           isConfirmed: false,
           isOvernight: isOvernight,
-          isLeave: modalType === 'leave' ? false : (isLeave || false),
-          leaveType: leaveType || "",
-          leaveEndDate: modalType === 'leave' ? leaveEndDate || date : "",
-          leaveDays: modalType === 'leave' ? leaveDays || 1 : 0,
-          excludeWeekends: modalType === 'leave' ? excludeWeekends || false : false,
+          isLeave: isLeave || false,
+          leaveType: isLeave ? leaveType || "" : "",
+          leaveEndDate: leaveEndDate || "",
+          leaveDays: isLeave ? leaveDays || 1 : 0,
+          excludeWeekends: isLeave ? excludeWeekends || false : false,
           isLeaveRequestPending: modalType === 'leave' ? true : false,
           pendingLeaveType: modalType === 'leave' ? leaveType : "",
-          leaveRequestDenied: false
+          leaveRequestDenied: false,
+          userId: currentUserId
         })
       );
 
@@ -200,15 +261,17 @@ function CalendarPage() {
               setSelectedEvent(storedEvent);
             } else {
               // fallback if not in state for some reason
-              setSelectedDate(info.event.startStr || info.event.start?.toISOString().split('T')[0]);
+              const fallbackDate = info.event.startStr || info.event.start?.toISOString().split('T')[0];
+              setSelectedDate(fallbackDate);
               setSelectedEvent({
                 id: clickedId,
                 title: info.event.title,
-                date: info.event.startStr || info.event.start?.toISOString().split('T')[0],
+                date: fallbackDate,
                 timeIn: '',
                 timeOut: ''
               });
             }
+            setSidebarOpen(true);
             setTimeLogOpen(true);
           }}
           events={formattedEvents}
@@ -219,9 +282,14 @@ function CalendarPage() {
 
       <ScheduleModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingEvent(null);
+        }}
         selectedDate={selectedDate}
+        event={editingEvent}
         onSave={handleSave}
+        onUpdate={handleUpdate}
         modalType={modalType}
       />
 
@@ -254,13 +322,24 @@ function CalendarPage() {
         }}
       />
 
-      {selectedDate && (
+      {selectedDate && sidebarOpen && (
         <DayScheduleSidebar
           selectedDate={selectedDate}
           events={visibleEvents}
-          onClose={() => setSelectedDate(null)}
-          onAddNew={() => { setModalType('schedule'); setModalOpen(true); }}
-          onMarkLeave={() => { setModalType('leave'); setModalOpen(true); }}
+          onClose={() => setSidebarOpen(false)}
+          onAddNew={() => {
+            setTimeLogOpen(false);
+            setSidebarOpen(false);
+            setModalType('schedule');
+            setModalOpen(true);
+          }}
+          onMarkLeave={() => {
+            setTimeLogOpen(false);
+            setSidebarOpen(false);
+            setModalType('leave');
+            setModalOpen(true);
+          }}
+          onEditEvent={handleEditEvent}
         />
       )}
     </Container>
@@ -283,43 +362,44 @@ const Container = styled.div`
 const Title = styled.h2`
   margin-bottom: 24px;
   font-size: 28px;
-  color: #1e293b;
+  color: ${({ theme }) => theme.text.primary};
   font-weight: 700;
-  border-bottom: 3px solid #e2e8f0;
+  border-bottom: 3px solid ${({ theme }) => theme.border.main};
   padding-bottom: 12px;
 `;
 
 const CalendarBox = styled.div`
-  background: #ffffff;
+  background: ${({ theme }) => theme.bg.card};
   padding: 24px;
   border-radius: 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid ${({ theme }) => theme.border.main};
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 
   /* FullCalendar custom styling for high contrast */
   .fc-theme-standard .fc-scrollgrid {
-    border-color: #e2e8f0;
+    border-color: ${({ theme }) => theme.border.main};
   }
   .fc-theme-standard td, .fc-theme-standard th {
-    border-color: #e2e8f0;
+    border-color: ${({ theme }) => theme.border.main};
   }
   .fc-button-primary {
-    background-color: #2563eb !important;
-    border-color: #2563eb !important;
+    background-color: ${({ theme }) => theme.primary.main} !important;
+    border-color: ${({ theme }) => theme.primary.main} !important;
     text-transform: capitalize;
     font-weight: 600;
+    color: #ffffff !important;
   }
   .fc-button-active {
-    background-color: #1d4ed8 !important;
+    background-color: ${({ theme }) => theme.primary.hover} !important;
   }
   .fc-col-header-cell-cushion {
-    color: #0f172a;
+    color: ${({ theme }) => theme.text.primary};
     font-size: 16px;
     padding: 8px;
     text-transform: uppercase;
   }
   .fc-daygrid-day-number {
-    color: #475569;
+    color: ${({ theme }) => theme.text.secondary};
     font-size: 16px;
     font-weight: 600;
   }
@@ -333,11 +413,11 @@ const CalendarBox = styled.div`
 
   /* Styling for past dates - keeping grey background but allowing interaction */
   .fc-day-past {
-    background-color: #f8fafc !important;
+    background-color: ${({ theme }) => theme.bg.main} !important;
   }
   .fc-day-past .fc-daygrid-day-number,
   .fc-day-past .fc-col-header-cell-cushion {
-    color: #94a3b8 !important;
+    color: ${({ theme }) => theme.text.muted} !important;
   }
   .fc-day-past .fc-event {
     opacity: 0.8;

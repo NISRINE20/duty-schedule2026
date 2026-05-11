@@ -2,19 +2,22 @@ import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { calculateLeaveEndDate } from "../utils/leaveCalculations";
 
-function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
+function ScheduleModal({ isOpen, onClose, selectedDate, onSave, onUpdate, event, modalType }) {
   const [isRepeating, setIsRepeating] = useState(false);
   const [untilDate, setUntilDate] = useState("");
   const [selectedDays, setSelectedDays] = useState([]);
   const [leaveEndDate, setLeaveEndDate] = useState("");
   const [leaveDays, setLeaveDays] = useState(1);
   const [excludeWeekends, setExcludeWeekends] = useState(false);
-  const [shiftType, setShiftType] = useState('Morning');
+  const [shiftType, setShiftType] = useState('AM');
   const [leaveType, setLeaveType] = useState('Sick Leave');
   const [otherLeaveStr, setOtherLeaveStr] = useState('');
   const [name, setName] = useState('');
+  const [scheduledTimeIn, setScheduledTimeIn] = useState('08:00');
+  const [scheduledTimeOut, setScheduledTimeOut] = useState('17:00');
 
   const authName = localStorage.getItem('authName');
+  const authRole = localStorage.getItem('authRole');
 
   const daysOfWeek = [
     { label: 'Sun', value: 0 },
@@ -28,57 +31,84 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
 
   useEffect(() => {
     if (isOpen) {
+      const baseDate = event?.date || selectedDate;
+      const rawTitle = event?.title?.replace(/^✅\s*|^❌\s*|^⏳ PENDING:\s*/i, '').trim();
+      const parsedName = rawTitle ? rawTitle.split(' - ')[0] : '';
+
       setIsRepeating(false);
       setUntilDate("");
-      setShiftType(modalType === 'leave' ? 'Leave' : 'Morning');
-      setLeaveType('Sick Leave');
+      setShiftType(event ? (event.isLeave ? 'Leave' : (rawTitle?.split(' - ')[1] || 'AM')) : (modalType === 'leave' ? 'Leave' : 'AM'));
+      setLeaveType(event?.leaveType || event?.pendingLeaveType || 'Sick Leave');
       setOtherLeaveStr('');
-      setLeaveDays(1);
-      setExcludeWeekends(false);
-      setLeaveEndDate(selectedDate || '');
-      setName(authName || '');
-      if (selectedDate) {
-        // We'll treat the string YYYY-MM-DD correctly, taking timezone into account
-        const [year, month, day] = selectedDate.split('-');
+      setLeaveDays(event?.leaveDays || 1);
+      setExcludeWeekends(event?.excludeWeekends || false);
+      setLeaveEndDate(event?.leaveEndDate || baseDate || '');
+      setName(event ? parsedName : (authRole === 'user' ? (authName || '') : ''));
+      setScheduledTimeIn(event?.scheduledTimeIn || '08:00');
+      setScheduledTimeOut(event?.scheduledTimeOut || '17:00');
+      if (baseDate) {
+        const [year, month, day] = baseDate.split('-');
         const d = new Date(year, month - 1, day);
         setSelectedDays([d.getDay()]);
       } else {
         setSelectedDays([]);
       }
     }
-  }, [isOpen, selectedDate, modalType, authName]);
+  }, [isOpen, selectedDate, modalType, authName, authRole, event]);
 
   // Recalculate leave end date when days or weekend exclusion changes
   useEffect(() => {
-    if (modalType === 'leave' && selectedDate && leaveDays > 0) {
+    if ((modalType === 'leave' || shiftType === 'Leave') && selectedDate && leaveDays > 0) {
       const calculatedEndDate = calculateLeaveEndDate(selectedDate, leaveDays, excludeWeekends);
       setLeaveEndDate(calculatedEndDate);
     }
-  }, [selectedDate, leaveDays, excludeWeekends, modalType]);
+  }, [selectedDate, leaveDays, excludeWeekends, modalType, shiftType]);
+
+  const isEditing = !!event;
+  const isReadOnly = event?.leaveRequestDenied === true;
+  const modalHeading = isReadOnly
+    ? 'Denied Leave Details'
+    : isEditing
+      ? (event?.isLeave ? 'Edit Leave' : 'Edit Duty Schedule')
+      : (modalType === 'leave' ? 'Request Leave' : 'Add Duty Schedule');
 
   if (!isOpen) return null;
 
   return (
     <Overlay>
       <ModalContainer $isRepeating={isRepeating}>
-        <h2>{modalType === 'leave' ? 'Request Leave' : 'Add Duty Schedule'}</h2>
+        <h2>{modalHeading}</h2>
         <CloseButton onClick={onClose}>×</CloseButton>
         <p>Date: {selectedDate}</p>
+        {isReadOnly && (
+          <div style={{ marginBottom: '16px', padding: '14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', color: '#991b1b', fontWeight: '600' }}>
+            ❌ This leave request was denied and can no longer be edited.
+          </div>
+        )}
 
         <Grid $isRepeating={isRepeating}>
           <Column>
             <Label>Name:</Label>
-            <Input type="text" id="name" value={name} onChange={e => setName(e.target.value)} />
+            <Input type="text" id="name" value={name} disabled={isReadOnly} onChange={e => setName(e.target.value)} />
 
             <Label>Shift:</Label>
-            <Select id="shift" value={shiftType} onChange={e => setShiftType(e.target.value)}>
+            <Select id="shift" value={shiftType} disabled={isReadOnly} onChange={e => {
+              const newShift = e.target.value;
+              setShiftType(newShift);
+              if (newShift === 'PM') {
+                setScheduledTimeIn('20:00');
+                setScheduledTimeOut('05:00');
+              } else if (newShift === 'AM') {
+                setScheduledTimeIn('08:00');
+                setScheduledTimeOut('17:00');
+              }
+            }}>
               {modalType === 'leave' ? (
                 <option value="Leave">Leave</option>
               ) : (
                 <>
-                  <option value="Morning">Morning</option>
-                  <option value="Afternoon">Afternoon</option>
-                  <option value="Night">Night</option>
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
                   <option value="Leave">Leave</option>
                 </>
               )}
@@ -87,15 +117,15 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
             {shiftType !== 'Leave' ? (
               <>
                 <Label>Scheduled Time In:</Label>
-                <Input type="time" id="scheduledTimeIn" defaultValue="08:00" />
+                <Input type="time" id="scheduledTimeIn" value={scheduledTimeIn} disabled={isReadOnly} onChange={e => setScheduledTimeIn(e.target.value)} />
                 
                 <Label>Scheduled Time Out:</Label>
-                <Input type="time" id="scheduledTimeOut" defaultValue="17:00" />
+                <Input type="time" id="scheduledTimeOut" value={scheduledTimeOut} disabled={isReadOnly} onChange={e => setScheduledTimeOut(e.target.value)} />
               </>
             ) : (
               <>
                 <Label>Leave Type:</Label>
-                <Select value={leaveType} onChange={e => setLeaveType(e.target.value)}>
+                <Select value={leaveType} disabled={isReadOnly} onChange={e => setLeaveType(e.target.value)}>
                   <option value="Sick Leave">Sick Leave</option>
                   <option value="Informal Leave">Informal Leave</option>
                   <option value="Ordinary Leave">Ordinary Leave</option>
@@ -109,6 +139,7 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                     placeholder="Specify leave type..."
                     style={{ marginTop: '12px' }}
                     value={otherLeaveStr}
+                    disabled={isReadOnly}
                     onChange={e => setOtherLeaveStr(e.target.value)}
                   />
                 )}
@@ -119,6 +150,7 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                   min="1"
                   max="365"
                   value={leaveDays}
+                  disabled={isReadOnly}
                   onChange={(e) => setLeaveDays(Math.max(1, parseInt(e.target.value) || 1))}
                 />
 
@@ -127,6 +159,7 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                     type="checkbox"
                     id="excludeWeekends"
                     checked={excludeWeekends}
+                    disabled={isReadOnly}
                     onChange={(e) => setExcludeWeekends(e.target.checked)}
                   />
                   <label htmlFor="excludeWeekends">Exclude weekends (working days only)</label>
@@ -136,6 +169,7 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                 <Input
                   type="date"
                   value={leaveEndDate}
+                  disabled={isReadOnly}
                   onChange={(e) => setLeaveEndDate(e.target.value)}
                   min={selectedDate}
                 />
@@ -151,6 +185,7 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                   type="checkbox"
                   id="isRepeating"
                   checked={isRepeating}
+                  disabled={isReadOnly}
                   onChange={(e) => setIsRepeating(e.target.checked)}
                 />
                 <label htmlFor="isRepeating">Repeat Schedule?</label>
@@ -168,6 +203,7 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                       key={day.value}
                       active={selectedDays.includes(day.value)}
                       onClick={() => {
+                        if (isReadOnly) return;
                         if (selectedDays.includes(day.value)) {
                           setSelectedDays(selectedDays.filter(d => d !== day.value));
                         } else {
@@ -185,6 +221,7 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                   type="date" 
                   id="untilDate" 
                   value={untilDate}
+                  disabled={isReadOnly}
                   onChange={(e) => setUntilDate(e.target.value)}
                   min={selectedDate}
                   style={{ boxSizing: 'border-box' }}
@@ -196,23 +233,24 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
 
         <ButtonGroup>
           <Button onClick={onClose}>Cancel</Button>
-          <Button
-            primary
-            onClick={() => {
-              const name = document.getElementById("name").value.trim();
-              if (!name) {
+          {!isReadOnly && (
+            <Button
+              primary
+              onClick={() => {
+              const trimmedName = name.trim();
+              if (!trimmedName) {
                 alert("Please enter a name.");
                 return;
               }
 
-              let scheduledTimeIn = "";
-              let scheduledTimeOut = "";
+              let finalScheduledTimeIn = "";
+              let finalScheduledTimeOut = "";
               let isLeave = false;
               let finalLeaveType = "";
 
               if (shiftType !== 'Leave') {
-                scheduledTimeIn = document.getElementById("scheduledTimeIn").value;
-                scheduledTimeOut = document.getElementById("scheduledTimeOut").value;
+                finalScheduledTimeIn = scheduledTimeIn;
+                finalScheduledTimeOut = scheduledTimeOut;
               } else {
                 isLeave = true;
                 finalLeaveType = leaveType === 'Other' ? otherLeaveStr : leaveType;
@@ -221,12 +259,12 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                   return;
                 }
               }
-              
-              if (modalType !== 'leave' && isRepeating && !untilDate) {
+
+              if (!event && modalType !== 'leave' && isRepeating && !untilDate) {
                 alert("Please select an Until Date for the repeating schedule.");
                 return;
               }
-              if (modalType !== 'leave' && isRepeating && selectedDays.length === 0) {
+              if (!event && modalType !== 'leave' && isRepeating && selectedDays.length === 0) {
                 alert("Please select at least one day to repeat.");
                 return;
               }
@@ -234,7 +272,7 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                 alert("Please select the leave end date.");
                 return;
               }
-              if (shiftType === 'Leave' && leaveEndDate < selectedDate) {
+              if (shiftType === 'Leave' && leaveEndDate < (event?.date || selectedDate)) {
                 alert("Leave end date cannot be before the start date.");
                 return;
               }
@@ -243,25 +281,37 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, modalType }) {
                 return;
               }
 
-              onSave({ 
-                name, 
-                shift: shiftType, 
-                scheduledTimeIn, 
-                scheduledTimeOut, 
-                isRepeating, 
-                selectedDays, 
+              const payload = {
+                title: isLeave ? `${trimmedName} - Leave Request` : `${trimmedName} - ${shiftType}`,
+                name: trimmedName,
+                shift: shiftType,
+                isRepeating,
+                selectedDays,
                 untilDate,
+                scheduledTimeIn: finalScheduledTimeIn,
+                scheduledTimeOut: finalScheduledTimeOut,
                 isLeave,
                 leaveType: finalLeaveType,
                 leaveEndDate,
                 leaveDays,
-                excludeWeekends
-              });
-              onClose();
+                excludeWeekends,
+                isOvernight: shiftType !== 'Leave' && finalScheduledTimeIn && finalScheduledTimeOut
+                  ? finalScheduledTimeOut <= finalScheduledTimeIn
+                  : false,
+                pendingLeaveType: isLeave ? finalLeaveType : '',
+                isLeaveRequestPending: isLeave ? true : false,
+              };
+
+              if (event && onUpdate) {
+                onUpdate(payload, event.id);
+              } else {
+                onSave(payload);
+              }
             }}
           >
-            Save
+            {event ? 'Update' : 'Save'}
           </Button>
+          )}
         </ButtonGroup>
       </ModalContainer>
     </Overlay>
@@ -295,16 +345,18 @@ const Overlay = styled.div`
 
 const ModalContainer = styled.div`
   background: #ffffff;
+  color: #0f172a;
   padding: 32px;
   border-radius: 16px;
   width: 90%;
   max-width: ${props => props.$isRepeating ? '900px' : '500px'};
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease-in-out;
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
+  border: 1px solid #e2e8f0;
 
   @keyframes slideUp {
     from { transform: translateY(20px); opacity: 0; }
@@ -327,13 +379,13 @@ const ModalContainer = styled.div`
 
   h2 {
     margin-top: 0;
-    color: #1e293b;
+    color: #0f172a;
     font-size: 24px;
     margin-bottom: 8px;
   }
 
   p {
-    color: #64748b;
+    color: #475569;
     margin-bottom: 24px;
     font-size: 16px;
   }
@@ -366,17 +418,18 @@ const Label = styled.label`
   display: block;
   margin-top: 16px;
   font-weight: 600;
-  color: #334155;
+  color: #0f172a;
   margin-bottom: 6px;
 `;
 
 const Input = styled.input`
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #cbd5e1;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
   font-size: 16px;
   color: #0f172a;
+  background: #ffffff;
   outline: none;
   transition: border-color 0.2s;
   box-sizing: border-box;
@@ -389,13 +442,13 @@ const Input = styled.input`
 const Select = styled.select`
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #cbd5e1;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
   font-size: 16px;
   color: #0f172a;
   outline: none;
   transition: border-color 0.2s;
-  background: white;
+  background: #ffffff;
   box-sizing: border-box;
 
   &:focus {
@@ -418,12 +471,12 @@ const Button = styled.button`
   font-size: 16px;
   font-weight: 600;
   transition: all 0.2s;
-  background: ${props => props.primary ? "#2563eb" : "#f1f5f9"};
-  color: ${props => props.primary ? "white" : "#475569"};
+  background: ${props => props.primary ? '#2563eb' : '#ffffff'};
+  color: ${props => props.primary ? '#ffffff' : '#0f172a'};
   box-shadow: ${props => props.primary ? "0 4px 10px rgba(37, 99, 235, 0.2)" : "none"};
 
   &:hover {
-    background: ${props => props.primary ? "#1d4ed8" : "#e2e8f0"};
+    background: ${props => props.primary ? '#1d4ed8' : '#f1f5f9'};
     transform: ${props => props.primary ? "translateY(-1px)" : "none"};
     box-shadow: ${props => props.primary ? "0 6px 15px rgba(37, 99, 235, 0.3)" : "none"};
   }
@@ -444,7 +497,7 @@ const CheckboxContainer = styled.div`
   label {
     font-size: 16px;
     font-weight: 500;
-    color: #334155;
+    color: #0f172a;
     cursor: pointer;
   }
 `;
@@ -452,8 +505,8 @@ const CheckboxContainer = styled.div`
 const DayToggle = styled.div`
   padding: 6px 14px;
   border-radius: 20px;
-  background: ${props => props.active ? '#2563eb' : '#e2e8f0'};
-  color: ${props => props.active ? 'white' : '#475569'};
+  background: ${props => props.active ? '#2563eb' : '#ffffff'};
+  color: ${props => props.active ? '#ffffff' : '#0f172a'};
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -461,7 +514,7 @@ const DayToggle = styled.div`
   transition: all 0.2s;
 
   &:hover {
-    background: ${props => props.active ? '#1d4ed8' : '#cbd5e1'};
+    background: ${props => props.active ? '#1d4ed8' : '#f1f5f9'};
   }
 `;
 
@@ -469,10 +522,10 @@ const CloseButton = styled.button`
   position: absolute;
   top: 15px;
   right: 15px;
-  background: none;
+  background: #ffffff;
   border: none;
   font-size: 24px;
-  color: #64748b;
+  color: #475569;
   cursor: pointer;
   padding: 5px;
   border-radius: 50%;
@@ -485,6 +538,6 @@ const CloseButton = styled.button`
 
   &:hover {
     background: #f1f5f9;
-    color: #334155;
+    color: #0f172a;
   }
 `;

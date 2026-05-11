@@ -23,9 +23,10 @@ function LoginPage() {
     return n.trim().toLowerCase().replace(/[^a-z0-9]/g, '') + '@dutyschedule.local';
   };
 
-  const handleLogin = (role, name = '') => {
+  const handleLogin = (role, name = '', uid = '') => {
     localStorage.setItem(STORAGE_KEYS.AUTH_ROLE, role);
     if (name) localStorage.setItem(STORAGE_KEYS.AUTH_NAME, name);
+    if (uid) localStorage.setItem(STORAGE_KEYS.AUTH_UID, uid);
     navigate('/');
   };
 
@@ -55,7 +56,7 @@ function LoginPage() {
           await auth.signOut();
           return;
         }
-        handleLogin(data.role, data.name);
+        handleLogin(data.role, data.name, userCredential.user.uid);
       } else {
         setShowConfirmModal({ open: true, title: 'Profile Not Found', message: "User profile not found in the database. Please contact an administrator.", isError: true });
         await auth.signOut();
