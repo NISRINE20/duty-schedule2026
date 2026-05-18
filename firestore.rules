@@ -9,7 +9,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
@@ -17,18 +17,24 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function canDeleteDeniedLeave() {
+      return resource.data.leaveRequestDenied == true &&
+             resource.data.leaveRequestDeniedAt != null &&
+             (request.time - resource.data.leaveRequestDeniedAt) > duration.value(24, 'h');
+    }
+
     // users collection
     match /users/{userId} {
       // Allow anyone to query admin users to check if an admin exists during signup
       // This is required because SignupPage queries admin users before authentication
       allow read: if resource.data.role == 'admin';
-      
+
       // Users can read/update their own profile, Admins have full access
       allow read, update: if isOwner(userId) || isAdmin();
-      
+
       // Creating a profile happens right after Firebase Auth creates the account
       allow create: if isOwner(userId);
-      
+
       // Admins can delete users
       allow delete: if isAdmin();
     }
@@ -37,16 +43,21 @@ service cloud.firestore {
     match /dutyEvents/{eventId} {
       // All authenticated users can read events
       allow read: if isAuthenticated();
-      
+
       // Authenticated users can create and update events (time logs, leave requests)
       allow create, update: if isAuthenticated();
 
+      // Allow deletion in these cases:
+      // 1. Admins can delete any event
+      // 2. Authenticated users can withdraw their own pending leave requests
+      // 3. System can automatically delete denied leave requests older than 24 hours
+      allow delete: if isAdmin() ||
+                     (canWithdrawPendingLeave() && isAuthenticated()) ||
+                     (canDeleteDeniedLeave() && isAuthenticated());
+
       function canWithdrawPendingLeave() {
-        return resource.data.isLeaveRequestPending == true && isAuthenticated();
+        return resource.data.isLeaveRequestPending == true;
       }
-      
-      // Only admins can delete events, except authenticated users may withdraw their own pending leave request.
-      allow delete: if isAdmin() || canWithdrawPendingLeave();
     }
 
     // config collection (for templates)

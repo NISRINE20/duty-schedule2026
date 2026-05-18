@@ -29,9 +29,9 @@ function SummaryPage() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "dutyEvents"), (snapshot) => {
-      const data = snapshot.docs.map(docSnapshot => ({ 
-        id: docSnapshot.id, 
-        ...docSnapshot.data() 
+      const data = snapshot.docs.map(docSnapshot => ({
+        id: docSnapshot.id,
+        ...docSnapshot.data()
       }));
       setEvents(data);
       setIsLoading(false);
@@ -119,7 +119,7 @@ function SummaryPage() {
     return acc;
   }, {})).sort((a, b) => a.name.localeCompare(b.name));
 
-  const monthlyRotationData = allMonthlyRotationData.filter(row => 
+  const monthlyRotationData = allMonthlyRotationData.filter(row =>
     row.name.toLowerCase().includes(monthlySearchName.toLowerCase())
   );
 
@@ -136,7 +136,7 @@ function SummaryPage() {
     setIsLoading(true);
     try {
       const leftLogo = await loadImg('/left-logo.png');
-      const rightLogo = await loadImg('/right-logo.png');
+      const rightLogo = await loadImg('/EMClogo.png');
 
       const doc = new jsPDF('landscape');
       const pageWidth = doc.internal.pageSize.width;
@@ -149,9 +149,9 @@ function SummaryPage() {
           doc.addImage(leftLogo, 'PNG', 20, 15, w, 26);
         }
         if (rightLogo) {
-          const rightH = 32;
+          const rightH = 26;
           const w = rightH * (rightLogo.width / rightLogo.height);
-          doc.addImage(rightLogo, 'PNG', pageWidth - 20 - w, 15 - ((rightH - 26) / 2), w, rightH);
+          doc.addImage(rightLogo, 'PNG', pageWidth - 20 - w, 15, w, rightH);
         }
 
         doc.setFont("times", "bold");
@@ -160,14 +160,14 @@ function SummaryPage() {
 
         doc.text("HEADQUARTERS", centerX, 20, { align: "center" });
         doc.text("EASTERN MINDANAO COMMAND", centerX, 26, { align: "center" });
-        
+
         doc.setFont("times", "normal");
         doc.setFontSize(11);
         doc.text("ARMED FORCES OF THE PHILIPPINES", centerX, 32, { align: "center" });
-        
+
         doc.setFont("times", "bold");
         doc.text("Office of the Assistant Chief of Unified Command Staff for Personnel, U1", centerX, 38, { align: "center" });
-        
+
         doc.setFont("times", "italic");
         doc.text("Naval Station Felix Apolinario, Panacan, Davao City", centerX, 44, { align: "center" });
 
@@ -182,14 +182,14 @@ function SummaryPage() {
         // Add Summary specific title slightly above the table
         doc.setFont("times", "bold");
         doc.setFontSize(11);
-        const titleText = authRole === 'admin' 
-          ? `Daily Duty Summary: ${selectedDate}` 
+        const titleText = authRole === 'admin'
+          ? `Daily Duty Summary: ${selectedDate}`
           : `Personal Daily Duty Summary: ${selectedDate} - ${authName}`;
         doc.text(titleText, 14, 60);
       };
 
       drawHeaderAndFooter();
-      
+
       const header = [["Name / Shift", "Date", "Scheduled", "Leave Days", "Actual In", "Actual Out", "Status"]];
       const data = dayEvents.map((event) => {
         const status = getEventStatus(
@@ -203,7 +203,7 @@ function SummaryPage() {
           event.leaveType
         );
         const nameDisplay = event.title ? event.title : "Unknown";
-        
+
         return [
           nameDisplay,
           getDisplayDate(event),
@@ -230,7 +230,7 @@ function SummaryPage() {
       });
 
       doc.save(`duty-summary-${selectedDate}.pdf`);
-    } catch(err) {
+    } catch (err) {
       console.error(err);
       alert("Error generating PDF: " + err.message);
     } finally {
@@ -242,7 +242,7 @@ function SummaryPage() {
     setIsLoading(true);
     try {
       const leftLogo = await loadImg('/left-logo.png');
-      const rightLogo = await loadImg('/right-logo.png');
+      const rightLogo = await loadImg('/EMClogo.png');
 
       const doc = new jsPDF('landscape');
       const pageWidth = doc.internal.pageSize.width;
@@ -255,9 +255,9 @@ function SummaryPage() {
           doc.addImage(leftLogo, 'PNG', 20, 15, w, 26);
         }
         if (rightLogo) {
-          const rightH = 32;
+          const rightH = 26;
           const w = rightH * (rightLogo.width / rightLogo.height);
-          doc.addImage(rightLogo, 'PNG', pageWidth - 20 - w, 15 - ((rightH - 26) / 2), w, rightH);
+          doc.addImage(rightLogo, 'PNG', pageWidth - 20 - w, 15, w, rightH);
         }
 
         doc.setFont("times", "bold");
@@ -266,14 +266,14 @@ function SummaryPage() {
 
         doc.text("HEADQUARTERS", centerX, 20, { align: "center" });
         doc.text("EASTERN MINDANAO COMMAND", centerX, 26, { align: "center" });
-        
+
         doc.setFont("times", "normal");
         doc.setFontSize(11);
         doc.text("ARMED FORCES OF THE PHILIPPINES", centerX, 32, { align: "center" });
-        
+
         doc.setFont("times", "bold");
         doc.text("Office of the Assistant Chief of Unified Command Staff for Personnel, U1", centerX, 38, { align: "center" });
-        
+
         doc.setFont("times", "italic");
         doc.text("Naval Station Felix Apolinario, Panacan, Davao City", centerX, 44, { align: "center" });
 
@@ -297,14 +297,26 @@ function SummaryPage() {
       };
 
       drawHeaderAndFooter();
-      
-      const detailedHeader = [["Name", "Date", "Shift/Status", "Actual In", "Actual Out", "Remarks"]];
+
+      const detailedHeader = [["Personnel Name", "Date", "Shift", "Actual In", "Actual Out", "Status", "Remarks"]];
       const detailedData = [];
+      
       monthlyRotationData.forEach(row => {
-        row.events.sort((a,b) => a.date.localeCompare(b.date)).forEach(e => {
+        row.events.sort((a, b) => a.date.localeCompare(b.date)).forEach(e => {
           let shiftName = e.title.split(' - ')[1] || 'Duty';
           if (shiftName === 'Morning') shiftName = 'AM';
           if (shiftName === 'Afternoon' || shiftName === 'Night') shiftName = 'PM';
+
+          const status = getEventStatus(
+            e.timeIn,
+            e.timeOut,
+            e.scheduledTimeIn,
+            e.scheduledTimeOut,
+            e.date,
+            e.isOvernight,
+            e.isLeave,
+            e.leaveType
+          );
 
           detailedData.push([
             row.name,
@@ -312,6 +324,7 @@ function SummaryPage() {
             e.isLeave ? `Excused` : shiftName,
             e.timeIn || '--',
             e.timeOut || '--',
+            status || 'Unknown',
             e.isLeave ? e.leaveType : ''
           ]);
         });
@@ -332,7 +345,7 @@ function SummaryPage() {
       });
 
       doc.save(`monthly-summary-${selectedMonth}${monthlySearchName ? `-${monthlySearchName}` : ''}.pdf`);
-    } catch(err) {
+    } catch (err) {
       console.error(err);
       alert("Error generating PDF: " + err.message);
     } finally {
@@ -344,7 +357,7 @@ function SummaryPage() {
     <Container>
       {isLoading && <Loader message="Loading summary..." />}
       <Title>Duty Summary</Title>
-      
+
       <LayoutGrid>
         <CalendarSide>
           <div className="calendar-wrapper">
@@ -415,7 +428,7 @@ function SummaryPage() {
                         <td>{row.Leave}</td>
                         <td>{row.Total}</td>
                         <td>
-                          <button 
+                          <button
                             onClick={() => setExpandedRowName(expandedRowName === row.name ? null : row.name)}
                             style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', transition: 'all 0.2s' }}
                             onMouseOver={(e) => { e.currentTarget.style.background = '#dbeafe'; }}
@@ -432,7 +445,7 @@ function SummaryPage() {
                               <strong style={{ display: 'block', marginBottom: '10px', color: '#0f172a' }}>Scheduled Dates for {row.name}:</strong>
                               {row.events.length > 0 ? (
                                 <ul style={{ margin: '0', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                  {row.events.sort((a,b) => a.date.localeCompare(b.date)).map(e => {
+                                  {row.events.sort((a, b) => a.date.localeCompare(b.date)).map(e => {
                                     let shiftDisplay = e.title.split(' - ')[1] || 'Duty';
                                     if (shiftDisplay === 'Morning') shiftDisplay = 'AM';
                                     if (shiftDisplay === 'Afternoon' || shiftDisplay === 'Night') shiftDisplay = 'PM';
@@ -486,70 +499,70 @@ function SummaryPage() {
 
             <TableContainer>
               <Table>
-              <thead>
-                <tr>
-                  <th>Name / Shift</th>
-                  <th>Date</th>
-                  <th>Scheduled</th>
-                  <th>Leave Days</th>
-                  <th>Actual In</th>
-                  <th>Actual Out</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dayEvents.length > 0 ? (
-                  dayEvents.map(event => {
-                    const status = getEventStatus(
-                      event.timeIn,
-                      event.timeOut,
-                      event.scheduledTimeIn,
-                      event.scheduledTimeOut,
-                      event.date,
-                      event.isOvernight,
-                      event.isLeave,
-                      event.leaveType
-                    );
-                    let nameDisplay = event.title ? event.title : "Unknown";
-                    if (nameDisplay.includes(' - ')) {
-                      const parts = nameDisplay.split(' - ');
-                      let shift = parts[1];
-                      if (shift === 'Morning') shift = 'AM';
-                      if (shift === 'Afternoon' || shift === 'Night') shift = 'PM';
-                      nameDisplay = `${parts[0]} - ${shift}`;
-                    }
-                    
-                    return (
-                      <tr key={event.id}>
-                        <td>
-                          <strong>{nameDisplay}</strong>
-                          {event.isOvernight && event.date !== selectedDate && (
-                            <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>
-                              (Overnight)
-                            </span>
-                          )}
-                        </td>
-                        <td>{getDisplayDate(event)}</td>
-                        <td>{event.isLeave ? <span style={{color: '#94a3b8', fontStyle: 'italic'}}>Excused</span> : `${event.scheduledTimeIn || '?'} - ${event.scheduledTimeOut || '?'}`}</td>
-                      <td>{event.isLeave ? (event.leaveDays || 1) : '-'}</td>
-                      <td>{event.timeIn || '-'}</td>
-                      <td>{event.timeOut || '-'}</td>
-                      <td>
-                          <StatusBadge color={getStatusColor(status)}>
-                            {status || 'Unknown'}
-                          </StatusBadge>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
+                <thead>
                   <tr>
-                    <td colSpan="7" className="empty-state">No scheduled duties for this date.</td>
+                    <th>Name / Shift</th>
+                    <th>Date</th>
+                    <th>Scheduled</th>
+                    <th>Leave Days</th>
+                    <th>Actual In</th>
+                    <th>Actual Out</th>
+                    <th>Status</th>
                   </tr>
-                )}
-              </tbody>
-            </Table>
-          </TableContainer>
+                </thead>
+                <tbody>
+                  {dayEvents.length > 0 ? (
+                    dayEvents.map(event => {
+                      const status = getEventStatus(
+                        event.timeIn,
+                        event.timeOut,
+                        event.scheduledTimeIn,
+                        event.scheduledTimeOut,
+                        event.date,
+                        event.isOvernight,
+                        event.isLeave,
+                        event.leaveType
+                      );
+                      let nameDisplay = event.title ? event.title : "Unknown";
+                      if (nameDisplay.includes(' - ')) {
+                        const parts = nameDisplay.split(' - ');
+                        let shift = parts[1];
+                        if (shift === 'Morning') shift = 'AM';
+                        if (shift === 'Afternoon' || shift === 'Night') shift = 'PM';
+                        nameDisplay = `${parts[0]} - ${shift}`;
+                      }
+
+                      return (
+                        <tr key={event.id}>
+                          <td>
+                            <strong>{nameDisplay}</strong>
+                            {event.isOvernight && event.date !== selectedDate && (
+                              <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>
+                                (Overnight)
+                              </span>
+                            )}
+                          </td>
+                          <td>{getDisplayDate(event)}</td>
+                          <td>{event.isLeave ? <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Excused</span> : `${event.scheduledTimeIn || '?'} - ${event.scheduledTimeOut || '?'}`}</td>
+                          <td>{event.isLeave ? (event.leaveDays || 1) : '-'}</td>
+                          <td>{event.timeIn || '-'}</td>
+                          <td>{event.timeOut || '-'}</td>
+                          <td>
+                            <StatusBadge color={getStatusColor(status)}>
+                              {status || 'Unknown'}
+                            </StatusBadge>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="7" className="empty-state">No scheduled duties for this date.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </Table>
+            </TableContainer>
           </div>
         </DataSide>
       </LayoutGrid>

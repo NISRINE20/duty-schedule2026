@@ -126,7 +126,7 @@ function LoginPage() {
 
             <ButtonGroup>
               <Button type="button" onClick={resetForm}>Back</Button>
-              <Button primary type="submit">Login</Button>
+              <Button $primary type="submit">Login</Button>
             </ButtonGroup>
           </UserForm>
         )}
@@ -313,11 +313,11 @@ const Button = styled.button`
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  background: ${props => props.primary ? "#3b82f6" : "#f1f5f9"};
-  color: ${props => props.primary ? "white" : "#475569"};
+  background: ${props => props.$primary ? "#3b82f6" : "#f1f5f9"};
+  color: ${props => props.$primary ? "white" : "#475569"};
 
   &:hover {
-    background: ${props => props.primary ? "#2563eb" : "#e2e8f0"};
+    background: ${props => props.$primary ? "#2563eb" : "#e2e8f0"};
     transform: translateY(-2px);
   }
 `;
