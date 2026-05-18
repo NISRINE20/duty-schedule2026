@@ -15,6 +15,8 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, onUpdate, event,
   const [name, setName] = useState('');
   const [scheduledTimeIn, setScheduledTimeIn] = useState('08:00');
   const [scheduledTimeOut, setScheduledTimeOut] = useState('17:00');
+  const [timeIn, setTimeIn] = useState('');
+  const [timeOut, setTimeOut] = useState('');
 
   const authName = localStorage.getItem('authName');
   const authRole = localStorage.getItem('authRole');
@@ -46,6 +48,8 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, onUpdate, event,
       setName(event ? parsedName : (authRole === 'user' ? (authName || '') : ''));
       setScheduledTimeIn(event?.scheduledTimeIn || '08:00');
       setScheduledTimeOut(event?.scheduledTimeOut || '17:00');
+      setTimeIn(event?.timeIn || '');
+      setTimeOut(event?.timeOut || '');
       if (baseDate) {
         const [year, month, day] = baseDate.split('-');
         const d = new Date(year, month - 1, day);
@@ -191,6 +195,17 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, onUpdate, event,
                 <label htmlFor="isRepeating">Repeat Schedule?</label>
               </CheckboxContainer>
             )}
+
+            {isEditing && authRole === 'admin' && shiftType !== 'Leave' && (
+              <div style={{ marginTop: '16px', padding: '16px', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                <h4 style={{ margin: '0 0 12px 0', color: '#1e40af', fontSize: '15px' }}>Logged Time (Admin Edit)</h4>
+                <Label style={{ marginTop: 0 }}>Actual Time In:</Label>
+                <Input type="time" value={timeIn} disabled={isReadOnly} onChange={e => setTimeIn(e.target.value)} style={{ marginBottom: '12px' }} />
+
+                <Label style={{ marginTop: 0 }}>Actual Time Out:</Label>
+                <Input type="time" value={timeOut} disabled={isReadOnly} onChange={e => setTimeOut(e.target.value)} />
+              </div>
+            )}
           </Column>
 
           {isRepeating && (
@@ -301,6 +316,11 @@ function ScheduleModal({ isOpen, onClose, selectedDate, onSave, onUpdate, event,
                 pendingLeaveType: isLeave ? finalLeaveType : '',
                 isLeaveRequestPending: isLeave ? true : false,
               };
+
+              if (isEditing && authRole === 'admin' && shiftType !== 'Leave') {
+                payload.timeIn = timeIn;
+                payload.timeOut = timeOut;
+              }
 
               if (event && onUpdate) {
                 onUpdate(payload, event.id);
